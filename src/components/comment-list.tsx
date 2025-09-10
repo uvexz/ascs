@@ -1,0 +1,47 @@
+'use client'
+
+import { CommentItem } from './comment-item'
+import { Separator } from '@/components/ui/separator'
+
+interface Comment {
+  id: string
+  content: string
+  author: string
+  email?: string
+  website?: string
+  createdAt: string
+  replies?: Comment[]
+}
+
+interface CommentListProps {
+  comments: Comment[]
+  siteId: string
+  pageId: string
+  onCommentAdded: () => void
+}
+
+export function CommentList({ comments, siteId, pageId, onCommentAdded }: CommentListProps) {
+  if (comments.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        还没有评论，来发表第一条评论吧！
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {comments.map((comment, index) => (
+        <div key={comment.id}>
+          <CommentItem
+            comment={comment}
+            siteId={siteId}
+            pageId={pageId}
+            onCommentAdded={onCommentAdded}
+          />
+          {index < comments.length - 1 && <Separator className="mt-6" />}
+        </div>
+      ))}
+    </div>
+  )
+}

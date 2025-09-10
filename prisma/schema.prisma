@@ -1,0 +1,85 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("users")
+}
+
+model Site {
+  id          String   @id @default(cuid())
+  hostname    String   @unique
+  name        String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  comments      Comment[]
+  subscriptions Subscription[]
+  
+  @@map("sites")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  author    String
+  email     String?
+  website   String?
+  pageId    String   // 页面标识符，如 "/posts/hello-world"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联到站点
+  siteId String
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  
+  // 回复功能
+  parentId String?
+  parent   Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
+  
+  @@map("comments")
+}
+
+model SystemConfig {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  
+  @@map("system_configs")
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  email     String
+  pageId    String
+  siteId    String
+  token     String   @unique // 用于退订
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  
+  @@unique([email, pageId, siteId])
+  @@map("subscriptions")
+}
