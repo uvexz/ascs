@@ -29,90 +29,10 @@ export default function DocsPage() {
 
           <Tabs defaultValue="deploy" className="space-y-8">
             <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="deploy">部署</TabsTrigger>
               <TabsTrigger value="embed">嵌入</TabsTrigger>
               <TabsTrigger value="config">配置</TabsTrigger>
               <TabsTrigger value="api">API</TabsTrigger>
             </TabsList>
-
-            {/* 部署教程 */}
-            <TabsContent value="deploy" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Download className="h-5 w-5" />
-                    快速部署
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">1. 克隆项目</h3>
-                    <div className="bg-muted p-4 rounded-md">
-                      <code className="text-sm">
-                        git clone https://github.com/your-repo/ascs.git<br/>
-                        cd ascs<br/>
-                        pnpm install
-                      </code>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">2. 配置环境变量</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      复制 <code>.env.example</code> 到 <code>.env</code> 并配置数据库连接：
-                    </p>
-                    <div className="bg-muted p-4 rounded-md">
-                      <pre className="text-sm">
-{`DATABASE_URL="postgresql://username:password@localhost:5432/ascs_db"
-NEXTAUTH_SECRET="your-secret-key-here"
-NEXTAUTH_URL="http://localhost:3000"`}
-                      </pre>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">3. 初始化数据库</h3>
-                    <div className="bg-muted p-4 rounded-md">
-                      <code className="text-sm">
-                        npx prisma migrate dev --name init<br/>
-                        npx prisma generate
-                      </code>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-3">4. 启动开发服务器</h3>
-                    <div className="bg-muted p-4 rounded-md">
-                      <code className="text-sm">pnpm dev</code>
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      访问 <code>http://localhost:3000</code> 查看评论系统
-                    </p>
-                  </div>
-
-                  <Alert>
-                    <MessageSquare className="h-4 w-4" />
-                    <AlertDescription>
-                      首次访问 <code>/admin</code> 时可以创建管理员账户
-                    </AlertDescription>
-                  </Alert>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Vercel 部署</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <ol className="list-decimal list-inside space-y-2 text-sm">
-                    <li>将代码推送到 GitHub</li>
-                    <li>在 Vercel 中导入项目</li>
-                    <li>配置环境变量（DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL）</li>
-                    <li>部署完成！</li>
-                  </ol>
-                </CardContent>
-              </Card>
-            </TabsContent>
 
             {/* 嵌入教程 */}
             <TabsContent value="embed" className="space-y-6">

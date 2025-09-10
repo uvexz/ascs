@@ -1,0 +1,154 @@
+'use client'
+
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { CommentForm } from '@/components/comment-form'
+import { CommentList } from '@/components/comment-list'
+
+interface Comment {
+    id: string
+    author: string
+    content: string
+    email?: string
+    website?: string
+    createdAt: string
+    replies: Comment[]
+}
+
+function EmbedContent() {
+    const searchParams = useSearchParams()
+    const siteId = searchParams.get('siteId')
+    const pageId = searchParams.get('pageId')
+    const [comments, setComments] = useState<Comment[]>([])
+    const [loading, setLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    // 发送高度变化消息给父窗口
+    const sendHeightToParent = () => {
+        if (containerRef.current && window.parent !== window) {
+            const height = containerRef.current.scrollHeight
+            window.parent.postMessage({
+                type: 'ascs-resize',
+                height: height + 20 // 添加一些边距
+            }, '*')
+        }
+    }
+
+    // 加载评论
+    const loadComments = async () => {
+        if (!siteId || !pageId) {
+            setError('缺少必要参数')
+            setLoading(false)
+            return
+        }
+
+        try {
+            const response = await fetch(`/api/comments?siteId=${encodeURIComponent(siteId)}&pageId=${encodeURIComponent(pageId)}`)
+            if (!response.ok) {
+                throw new Error('加载评论失败')
+            }
+            const data = await response.json()
+            setComments(data)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : '加载评论失败')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    // 评论添加后的回调
+    const handleCommentAdded = () => {
+        loadComments()
+    }
+
+    useEffect(() => {
+        loadComments()
+    }, [siteId, pageId])
+
+    // 监听内容变化，更新高度
+    useEffect(() => {
+        sendHeightToParent()
+
+        // 使用 ResizeObserver 监听容器大小变化
+        if (containerRef.current) {
+            const resizeObserver = new ResizeObserver(() => {
+                sendHeightToParent()
+            })
+
+            resizeObserver.observe(containerRef.current)
+
+            return () => {
+                resizeObserver.disconnect()
+            }
+        }
+    }, [comments, loading, error])
+
+    // 初始高度设置
+    useEffect(() => {
+        const timer = setTimeout(sendHeightToParent, 100)
+        return () => clearTimeout(timer)
+    }, [])
+
+    if (!siteId || !pageId) {
+        return (
+            <div ref={containerRef} className="p-4 text-center text-red-600">
+                <p>错误：缺少必要的参数 (siteId 或 pageId)</p>
+            </div>
+        )
+    }
+
+    if (loading) {
+        return (
+            <div ref={containerRef} className="p-4 text-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-gray-600">加载评论中...</p>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div ref={containerRef} className="p-4 text-center text-red-600">
+                <p>加载失败: {error}</p>
+                <button
+                    onClick={loadComments}
+                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                    重试
+                </button>
+            </div>
+        )
+    }
+
+    return (
+        <div ref={containerRef} className="max-w-4xl mx-auto">
+            <div className="space-y-6">
+                <CommentForm
+                    siteId={siteId}
+                    pageId={pageId}
+                    onCommentAdded={handleCommentAdded}
+                />
+                <CommentList
+                    comments={comments}
+                    siteId={siteId}
+                    pageId={pageId}
+                    onCommentAdded={loadComments}
+                />
+            </div>
+        </div>
+    )
+}
+
+export default function EmbedPage() {
+    return (
+        <Suspense fallback={
+            <div className="p-4 text-center">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                <p className="text-gray-600">加载中...</p>
+            </div>
+        }>
+            <EmbedContent />
+        </Suspense>
+    )
+}

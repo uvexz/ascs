@@ -130,7 +130,7 @@
     .then(site => {
       // 创建 iframe
       const iframe = document.createElement('iframe');
-      const iframeSrc = `${ASCS_HOST}/?siteId=${encodeURIComponent(site.id)}&pageId=${encodeURIComponent(customPageId)}`;
+      const iframeSrc = `${ASCS_HOST}/embed?siteId=${encodeURIComponent(site.id)}&pageId=${encodeURIComponent(customPageId)}`;
       
       iframe.src = iframeSrc;
       iframe.style.width = '100%';
