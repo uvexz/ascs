@@ -20,19 +20,31 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const comments = await prisma.comment.findMany({
-      where: {
-        siteId,
-        pageId,
-        parentId: null, // 只获取顶级评论
-      },
-      include: {
-        replies: {
-          orderBy: { createdAt: 'asc' },
+    // 递归获取所有评论及其回复
+    const buildCommentTree = async (parentId: string | null = null): Promise<any[]> => {
+      const comments = await prisma.comment.findMany({
+        where: {
+          siteId,
+          pageId,
+          parentId,
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+        orderBy: parentId ? { createdAt: 'asc' } : { createdAt: 'desc' },
+      })
+
+      const commentsWithReplies = await Promise.all(
+        comments.map(async (comment) => {
+          const replies = await buildCommentTree(comment.id)
+          return {
+            ...comment,
+            replies,
+          }
+        })
+      )
+
+      return commentsWithReplies
+    }
+
+    const comments = await buildCommentTree()
 
     return createCorsResponse(comments)
   } catch (error) {

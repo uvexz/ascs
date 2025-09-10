@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CommentForm } from '@/components/comment-form'
 import { CommentList } from '@/components/comment-list'
+import { MessageSquare } from 'lucide-react'
 
 interface Comment {
     id: string
@@ -12,7 +14,7 @@ interface Comment {
     email?: string
     website?: string
     createdAt: string
-    replies: Comment[]
+    replies?: Comment[]
 }
 
 function EmbedContent() {
@@ -50,6 +52,7 @@ function EmbedContent() {
             }
             const data = await response.json()
             setComments(data)
+            setError(null)
         } catch (err) {
             setError(err instanceof Error ? err.message : '加载评论失败')
         } finally {
@@ -92,50 +95,70 @@ function EmbedContent() {
 
     if (!siteId || !pageId) {
         return (
-            <div ref={containerRef} className="p-4 text-center text-red-600">
-                <p>错误：缺少必要的参数 (siteId 或 pageId)</p>
+            <div ref={containerRef} className="p-4">
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="text-center text-red-500">
+                            错误：缺少必要的参数 (siteId 或 pageId)
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         )
     }
 
     if (loading) {
         return (
-            <div ref={containerRef} className="p-4 text-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                <p className="text-gray-600">加载评论中...</p>
+            <div ref={containerRef} className="p-4">
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="text-center text-muted-foreground">
+                            加载评论中...
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         )
     }
 
     if (error) {
         return (
-            <div ref={containerRef} className="p-4 text-center text-red-600">
-                <p>加载失败: {error}</p>
-                <button
-                    onClick={loadComments}
-                    className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                    重试
-                </button>
+            <div ref={containerRef} className="p-4">
+                <Card>
+                    <CardContent className="p-6">
+                        <div className="text-center text-red-500">
+                            加载失败: {error}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         )
     }
 
     return (
-        <div ref={containerRef} className="max-w-4xl mx-auto">
-            <div className="space-y-6">
-                <CommentForm
-                    siteId={siteId}
-                    pageId={pageId}
-                    onCommentAdded={handleCommentAdded}
-                />
-                <CommentList
-                    comments={comments}
-                    siteId={siteId}
-                    pageId={pageId}
-                    onCommentAdded={loadComments}
-                />
-            </div>
+        <div ref={containerRef} className="w-full max-w-4xl mx-auto space-y-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <MessageSquare className="h-5 w-5" />
+                        评论 ({comments.length})
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <CommentList
+                        comments={comments}
+                        siteId={siteId}
+                        pageId={pageId}
+                        onCommentAdded={handleCommentAdded}
+                    />
+                </CardContent>
+            </Card>
+
+            <CommentForm
+                siteId={siteId}
+                pageId={pageId}
+                onCommentAdded={handleCommentAdded}
+            />
         </div>
     )
 }

@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Trash2, Globe, MessageSquare, Settings, LogOut, Mail, Send } from 'lucide-react'
+import { Trash2, Globe, MessageSquare, Settings, LogOut, Mail, Send, Edit, Code, Copy, Check } from 'lucide-react'
 import { Navigation } from '@/components/navigation'
 
 interface Site {
@@ -45,10 +45,20 @@ export default function AdminPage() {
   const [configLoading, setConfigLoading] = useState(false)
   const [configError, setConfigError] = useState('')
   const [configSuccess, setConfigSuccess] = useState('')
+  const [editingSite, setEditingSite] = useState<Site | null>(null)
+  const [showEmbedDetails, setShowEmbedDetails] = useState<Site | null>(null)
+  const [copiedCode, setCopiedCode] = useState('')
   const router = useRouter()
   
   // 新站点表单
   const [newSite, setNewSite] = useState({
+    hostname: '',
+    name: '',
+    description: ''
+  })
+
+  // 编辑站点表单
+  const [editSiteForm, setEditSiteForm] = useState({
     hostname: '',
     name: '',
     description: ''
@@ -212,6 +222,97 @@ export default function AdminPage() {
     }
   }
 
+  const handleEditSite = (site: Site) => {
+    setEditingSite(site)
+    setEditSiteForm({
+      hostname: site.hostname,
+      name: site.name || '',
+      description: site.description || ''
+    })
+  }
+
+  const handleUpdateSite = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!editingSite || !editSiteForm.hostname.trim()) {
+      alert('请输入域名')
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/sites/${editingSite.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editSiteForm),
+      })
+
+      if (response.ok) {
+        setEditingSite(null)
+        setEditSiteForm({ hostname: '', name: '', description: '' })
+        fetchSites()
+      } else {
+        const error = await response.json()
+        alert(error.error || '更新失败')
+      }
+    } catch (error) {
+      console.error('Error updating site:', error)
+      alert('更新失败')
+    }
+  }
+
+  const handleDeleteSite = async (site: Site) => {
+    const confirmMessage = site._count.comments > 0 
+      ? `确定要删除站点 "${site.name || site.hostname}" 吗？这将同时删除 ${site._count.comments} 条评论，此操作不可恢复！`
+      : `确定要删除站点 "${site.name || site.hostname}" 吗？`
+    
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/sites/${site.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        alert(`站点删除成功${result.deletedComments > 0 ? `，同时删除了 ${result.deletedComments} 条评论` : ''}`)
+        fetchSites()
+        fetchComments() // 刷新评论列表
+      } else {
+        const error = await response.json()
+        alert(error.error || '删除失败')
+      }
+    } catch (error) {
+      console.error('Error deleting site:', error)
+      alert('删除失败')
+    }
+  }
+
+  const handleShowEmbedDetails = (site: Site) => {
+    setShowEmbedDetails(site)
+  }
+
+  const copyToClipboard = async (text: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedCode(type)
+      setTimeout(() => setCopiedCode(''), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      alert('复制失败，请手动复制')
+    }
+  }
+
+  const getCurrentHost = () => {
+    if (typeof window !== 'undefined') {
+      return window.location.origin
+    }
+    return 'https://your-domain.com'
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('zh-CN')
   }
@@ -310,6 +411,33 @@ export default function AdminPage() {
                             <span>评论数: {site._count.comments}</span>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleShowEmbedDetails(site)}
+                          >
+                            <Code className="h-4 w-4 mr-1" />
+                            集成代码
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditSite(site)}
+                          >
+                            <Edit className="h-4 w-4 mr-1" />
+                            编辑
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteSite(site)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            删除
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -365,6 +493,213 @@ export default function AdminPage() {
             </CardContent>
           </Card>
         </div>
+  
+      {/* 编辑站点模态框 */}
+        {editingSite && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Edit className="h-5 w-5" />
+                    编辑站点
+                  </CardTitle>
+                  <Button variant="ghost" onClick={() => setEditingSite(null)}>
+                    ✕
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleUpdateSite} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-hostname">域名 *</Label>
+                    <Input
+                      id="edit-hostname"
+                      placeholder="example.com"
+                      value={editSiteForm.hostname}
+                      onChange={(e) => setEditSiteForm({ ...editSiteForm, hostname: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-name">站点名称</Label>
+                    <Input
+                      id="edit-name"
+                      placeholder="我的网站"
+                      value={editSiteForm.name}
+                      onChange={(e) => setEditSiteForm({ ...editSiteForm, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-description">站点描述</Label>
+                    <Textarea
+                      id="edit-description"
+                      placeholder="站点描述"
+                      value={editSiteForm.description}
+                      onChange={(e) => setEditSiteForm({ ...editSiteForm, description: e.target.value })}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setEditingSite(null)}>
+                      取消
+                    </Button>
+                    <Button type="submit">
+                      保存更改
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Embed 详情模态框 */}
+        {showEmbedDetails && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-3xl max-h-[80vh] overflow-y-auto">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Code className="h-5 w-5" />
+                    集成代码 - {showEmbedDetails.name || showEmbedDetails.hostname}
+                  </CardTitle>
+                  <Button variant="ghost" onClick={() => setShowEmbedDetails(null)}>
+                    ✕
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">基本集成</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      在你的网页中添加以下代码即可集成评论系统：
+                    </p>
+                    <div className="relative">
+                      <pre className="bg-muted p-4 rounded-md text-sm overflow-x-auto">
+                        <code>{`<!-- 评论容器 -->
+<div id="comments"></div>
+
+<!-- 加载评论系统 -->
+<script
+  src="${getCurrentHost()}/comments.js"
+  data-page-id="/your-page-path"
+  defer>
+</script>`}</code>
+                      </pre>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => copyToClipboard(`<!-- 评论容器 -->
+<div id="comments"></div>
+
+<!-- 加载评论系统 -->
+<script
+  src="${getCurrentHost()}/comments.js"
+  data-page-id="/your-page-path"
+  defer>
+</script>`, 'basic')}
+                      >
+                        {copiedCode === 'basic' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">高级配置</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      你可以通过以下参数自定义评论系统：
+                    </p>
+                    <div className="relative">
+                      <pre className="bg-muted p-4 rounded-md text-sm overflow-x-auto">
+                        <code>{`<!-- 评论容器 -->
+<div id="comments"></div>
+
+<!-- 加载评论系统（高级配置） -->
+<script
+  src="${getCurrentHost()}/comments.js"
+  data-page-id="/your-page-path"
+  data-ascs-host="${getCurrentHost()}"
+  data-container-id="comments"
+  defer>
+</script>`}</code>
+                      </pre>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => copyToClipboard(`<!-- 评论容器 -->
+<div id="comments"></div>
+
+<!-- 加载评论系统（高级配置） -->
+<script
+  src="${getCurrentHost()}/comments.js"
+  data-page-id="/your-page-path"
+  data-ascs-host="${getCurrentHost()}"
+  data-container-id="comments"
+  defer>
+</script>`, 'advanced')}
+                      >
+                        {copiedCode === 'advanced' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">参数说明</h3>
+                    <div className="space-y-3 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 bg-muted rounded">
+                        <div className="font-medium">data-page-id</div>
+                        <div className="text-muted-foreground">可选</div>
+                        <div>页面唯一标识符，用于区分不同页面的评论</div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 bg-muted rounded">
+                        <div className="font-medium">data-ascs-host</div>
+                        <div className="text-muted-foreground">可选</div>
+                        <div>ASCS 服务器地址，默认自动检测</div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 p-3 bg-muted rounded">
+                        <div className="font-medium">data-container-id</div>
+                        <div className="text-muted-foreground">可选</div>
+                        <div>评论容器的 ID，默认为 "comments"</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">站点信息</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <div className="font-medium text-muted-foreground">站点 ID</div>
+                        <div className="font-mono bg-muted px-2 py-1 rounded">{showEmbedDetails.id}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-muted-foreground">域名</div>
+                        <div className="font-mono bg-muted px-2 py-1 rounded">{showEmbedDetails.hostname}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-muted-foreground">评论数量</div>
+                        <div className="font-mono bg-muted px-2 py-1 rounded">{showEmbedDetails._count.comments}</div>
+                      </div>
+                      <div>
+                        <div className="font-medium text-muted-foreground">创建时间</div>
+                        <div className="font-mono bg-muted px-2 py-1 rounded">{formatDate(showEmbedDetails.createdAt)}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* 系统配置模态框 */}
         {showConfig && (

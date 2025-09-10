@@ -27,8 +27,8 @@ export default function DocsPage() {
             </p>
           </div>
 
-          <Tabs defaultValue="deploy" className="space-y-8">
-            <TabsList className="grid w-full grid-cols-4">
+          <Tabs defaultValue="embed" className="space-y-8">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="embed">嵌入</TabsTrigger>
               <TabsTrigger value="config">配置</TabsTrigger>
               <TabsTrigger value="api">API</TabsTrigger>

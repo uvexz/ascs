@@ -34,6 +34,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // 检查域名是否已存在
+    const existingSite = await prisma.site.findUnique({
+      where: { hostname },
+    })
+
+    if (existingSite) {
+      return NextResponse.json(
+        { error: '该域名已存在' },
+        { status: 400 }
+      )
+    }
+
     const site = await prisma.site.create({
       data: {
         hostname,
