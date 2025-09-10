@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { createCorsResponse, handleOptions } from '@/lib/cors'
+
+export async function OPTIONS() {
+  return handleOptions()
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -7,7 +12,7 @@ export async function GET(request: NextRequest) {
     const hostname = searchParams.get('host')
 
     if (!hostname) {
-      return NextResponse.json(
+      return createCorsResponse(
         { error: 'host parameter is required' },
         { status: 400 }
       )
@@ -27,10 +32,10 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    return NextResponse.json(site)
+    return createCorsResponse(site)
   } catch (error) {
     console.error('Error fetching site:', error)
-    return NextResponse.json(
+    return createCorsResponse(
       { error: 'Internal server error' },
       { status: 500 }
     )

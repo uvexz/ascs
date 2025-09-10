@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notifyNewComment } from '@/lib/notifications'
+import { createCorsResponse, handleOptions } from '@/lib/cors'
+
+export async function OPTIONS() {
+  return handleOptions()
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +14,7 @@ export async function GET(request: NextRequest) {
     const pageId = searchParams.get('pageId')
 
     if (!siteId || !pageId) {
-      return NextResponse.json(
+      return createCorsResponse(
         { error: 'siteId and pageId are required' },
         { status: 400 }
       )
@@ -29,10 +34,10 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    return NextResponse.json(comments)
+    return createCorsResponse(comments)
   } catch (error) {
     console.error('Error fetching comments:', error)
-    return NextResponse.json(
+    return createCorsResponse(
       { error: 'Internal server error' },
       { status: 500 }
     )
@@ -45,7 +50,7 @@ export async function POST(request: NextRequest) {
     const { siteId, pageId, author, content, email, website, parentId } = body
 
     if (!siteId || !pageId || !author || !content) {
-      return NextResponse.json(
+      return createCorsResponse(
         { error: 'siteId, pageId, author, and content are required' },
         { status: 400 }
       )
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest) {
     })
 
     if (!site) {
-      return NextResponse.json(
+      return createCorsResponse(
         { error: 'Site not found' },
         { status: 404 }
       )
@@ -99,10 +104,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    return NextResponse.json(comment, { status: 201 })
+    return createCorsResponse(comment, { status: 201 })
   } catch (error) {
     console.error('Error creating comment:', error)
-    return NextResponse.json(
+    return createCorsResponse(
       { error: 'Internal server error' },
       { status: 500 }
     )
