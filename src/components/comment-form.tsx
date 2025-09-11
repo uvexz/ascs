@@ -5,7 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import Cookies from 'js-cookie'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+import 'highlight.js/styles/github.css'
 
 interface CommentFormProps {
   siteId: string
@@ -27,6 +32,7 @@ export function CommentForm({
   const [website, setWebsite] = useState('')
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [mode, setMode] = useState<'edit' | 'preview'>('edit')
 
   // 从 cookies 加载用户信息
   useEffect(() => {
@@ -125,13 +131,43 @@ export function CommentForm({
               onChange={(e) => setWebsite(e.target.value)}
             />
           </div>
-          <Textarea
-            placeholder="写下你的评论... *"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            rows={4}
-            required
-          />
+          <Tabs value={mode} onValueChange={(value) => setMode(value as 'edit' | 'preview')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="edit">编辑</TabsTrigger>
+              <TabsTrigger value="preview">预览</TabsTrigger>
+            </TabsList>
+            <TabsContent value="edit" className="mt-2">
+              <Textarea
+                placeholder="写下你的评论..."
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={6}
+                required
+                className="resize-none"
+              />
+              <div className="mt-2 text-xs text-muted-foreground">
+                支持 Markdown 格式：**粗体** *斜体* `代码` [链接](url) &gt; 引用
+              </div>
+            </TabsContent>
+            <TabsContent value="preview" className="mt-2">
+              <div className="min-h-[150px] p-4 border rounded-md bg-muted/50">
+                {content ? (
+                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                    >
+                      {content}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-center py-8">
+                    在编辑标签页输入内容，然后切换到预览查看效果
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
           <div className="flex gap-2">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? '提交中...' : '提交评论'}

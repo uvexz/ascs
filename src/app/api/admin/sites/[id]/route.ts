@@ -7,7 +7,7 @@ export async function PUT(
 ) {
   try {
     const body = await request.json()
-    const { hostname, name, description } = body
+    const { hostname, name, description, alternateHostnames } = body
     const siteId = params.id
 
     if (!hostname) {
@@ -50,6 +50,7 @@ export async function PUT(
         hostname,
         name: name || hostname,
         description,
+        alternateHostnames: alternateHostnames || null,
       },
       include: {
         _count: {

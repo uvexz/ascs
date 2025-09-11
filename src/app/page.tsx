@@ -170,7 +170,7 @@ export default function Home() {
                   </p>
                   <div className="bg-muted p-3 rounded-md">
                     <code className="text-sm">
-                      git clone https://github.com/your-repo/ascs<br/>
+                      git clone https://github.com/uvexz/ascs<br/>
                       cd ascs<br/>
                       pnpm install<br/>
                       pnpm dev

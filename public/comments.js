@@ -123,7 +123,9 @@
   fetch(`${ASCS_HOST}/api/sites?host=${encodeURIComponent(currentHostname)}`)
     .then(response => {
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return response.json().then(errorData => {
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        });
       }
       return response.json();
     })
@@ -179,7 +181,7 @@
     })
     .catch(error => {
       console.error('ASCS: 加载失败', error);
-      showError('评论系统加载失败: ' + error.message);
+      showError(error.message);
     });
   
   // 显示错误信息

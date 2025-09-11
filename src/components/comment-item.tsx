@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button'
 import { MessageSquare } from 'lucide-react'
 import { CommentForm } from './comment-form'
 import { generateAvatarUrl } from '@/lib/avatar'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
+import 'highlight.js/styles/github.css'
 
 interface Comment {
   id: string
@@ -87,8 +91,13 @@ export function CommentItem({
             <time>{formatDate(comment.createdAt)}</time>
           </div>
           
-          <div className="text-sm leading-relaxed whitespace-pre-wrap">
-            {comment.content}
+          <div className="text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+            >
+              {comment.content}
+            </ReactMarkdown>
           </div>
           
           <div className="flex items-center gap-2">

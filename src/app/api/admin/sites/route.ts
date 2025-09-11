@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { hostname, name, description } = body
+    const { hostname, name, description, alternateHostnames } = body
 
     if (!hostname) {
       return NextResponse.json(
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
         hostname,
         name: name || hostname,
         description,
+        alternateHostnames: alternateHostnames || null,
       },
     })
 

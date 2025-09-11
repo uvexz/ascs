@@ -25,12 +25,13 @@ model User {
 }
 
 model Site {
-  id          String   @id @default(cuid())
-  hostname    String   @unique
-  name        String?
-  description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(cuid())
+  hostname      String   @unique
+  name          String?
+  description   String?
+  alternateHostnames String? // 备用域名，用逗号分隔，如 "alt1.com,alt2.com"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   
   comments      Comment[]
   subscriptions Subscription[]

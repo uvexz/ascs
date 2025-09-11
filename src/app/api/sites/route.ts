@@ -18,18 +18,41 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // 首先尝试通过主域名查找
     let site = await prisma.site.findUnique({
       where: { hostname },
     })
 
-    // 如果站点不存在，自动创建一个
+    // 如果没有找到，尝试通过备用域名查找
     if (!site) {
-      site = await prisma.site.create({
-        data: {
-          hostname,
-          name: hostname,
+      const allSites = await prisma.site.findMany({
+        where: {
+          alternateHostnames: {
+            not: null,
+          },
         },
       })
+
+      // 检查是否有站点的备用域名包含当前域名
+      const foundSite = allSites.find(s => {
+        if (!s.alternateHostnames) return false
+        const alternateDomains = s.alternateHostnames.split(',').map(d => d.trim())
+        return alternateDomains.includes(hostname)
+      })
+      
+      if (foundSite) {
+        site = foundSite
+      }
+    }
+
+    if (!site) {
+      return createCorsResponse(
+        {
+          error: '站点不存在。请在后台创建站点，或将本网站域名添加至现有站点的备用域名。',
+          code: 'SITE_NOT_FOUND'
+        },
+        { status: 404 }
+      )
     }
 
     return createCorsResponse(site)

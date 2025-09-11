@@ -54,14 +54,16 @@ export default function AdminPage() {
   const [newSite, setNewSite] = useState({
     hostname: '',
     name: '',
-    description: ''
+    description: '',
+    alternateHostnames: ''
   })
 
   // 编辑站点表单
   const [editSiteForm, setEditSiteForm] = useState({
     hostname: '',
     name: '',
-    description: ''
+    description: '',
+    alternateHostnames: ''
   })
 
   const fetchSites = async () => {
@@ -188,7 +190,7 @@ export default function AdminPage() {
       })
 
       if (response.ok) {
-        setNewSite({ hostname: '', name: '', description: '' })
+        setNewSite({ hostname: '', name: '', description: '', alternateHostnames: '' })
         setShowAddSite(false)
         fetchSites()
       } else {
@@ -227,7 +229,8 @@ export default function AdminPage() {
     setEditSiteForm({
       hostname: site.hostname,
       name: site.name || '',
-      description: site.description || ''
+      description: site.description || '',
+      alternateHostnames: (site as any).alternateHostnames || ''
     })
   }
 
@@ -250,7 +253,7 @@ export default function AdminPage() {
 
       if (response.ok) {
         setEditingSite(null)
-        setEditSiteForm({ hostname: '', name: '', description: '' })
+        setEditSiteForm({ hostname: '', name: '', description: '', alternateHostnames: '' })
         fetchSites()
       } else {
         const error = await response.json()
@@ -386,6 +389,18 @@ export default function AdminPage() {
                       onChange={(e) => setNewSite({ ...newSite, description: e.target.value })}
                       rows={3}
                     />
+                    <div className="space-y-2">
+                      <Label htmlFor="alternate-hostnames">备用域名</Label>
+                      <Input
+                        id="alternate-hostnames"
+                        placeholder="alt1.com,alt2.com (多个域名用逗号分隔)"
+                        value={newSite.alternateHostnames}
+                        onChange={(e) => setNewSite({ ...newSite, alternateHostnames: e.target.value })}
+                      />
+                      <p className="text-sm text-muted-foreground">
+                        多个域名请用逗号分隔，这些域名将可以访问此站点的评论系统
+                      </p>
+                    </div>
                     <Button type="submit">添加站点</Button>
                   </div>
                 </form>
@@ -539,6 +554,18 @@ export default function AdminPage() {
                       onChange={(e) => setEditSiteForm({ ...editSiteForm, description: e.target.value })}
                       rows={3}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-alternate-hostnames">备用域名</Label>
+                    <Input
+                      id="edit-alternate-hostnames"
+                      placeholder="alt1.com,alt2.com (多个域名用逗号分隔)"
+                      value={editSiteForm.alternateHostnames}
+                      onChange={(e) => setEditSiteForm({ ...editSiteForm, alternateHostnames: e.target.value })}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      多个域名请用逗号分隔，这些域名将可以访问此站点的评论系统
+                    </p>
                   </div>
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setEditingSite(null)}>
