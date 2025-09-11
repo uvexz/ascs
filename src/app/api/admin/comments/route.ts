@@ -6,8 +6,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit') || '20')
     const offset = parseInt(searchParams.get('offset') || '0')
+    const status = searchParams.get('status') || null // 获取状态参数
+
+    // 构建查询条件
+    const where = status ? { status: status as 'APPROVED' | 'PENDING' | 'REJECTED' } : {}
 
     const comments = await prisma.comment.findMany({
+      where,
       include: {
         site: {
           select: {

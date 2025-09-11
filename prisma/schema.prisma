@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,71 +14,61 @@ model User {
   password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@map("users")
 }
 
 model Site {
-  id            String   @id @default(cuid())
-  hostname      String   @unique
-  name          String?
-  description   String?
-  alternateHostnames String? // 备用域名，用逗号分隔，如 "alt1.com,alt2.com"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  comments      Comment[]
-  subscriptions Subscription[]
-  
+  id                 String         @id @default(cuid())
+  hostname           String         @unique
+  name               String?
+  description        String?
+  alternateHostnames String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  comments           Comment[]
+  subscriptions      Subscription[]
+
   @@map("sites")
 }
 
 model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  author    String
-  email     String?
-  website   String?
-  pageId    String   // 页面标识符，如 "/posts/hello-world"
-  status    CommentStatus @default(APPROVED) // 评论状态：APPROVED（正常）, PENDING（待审核）, REJECTED（垃圾评论）
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // 关联到站点
-  siteId String
-  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  
-  // 回复功能
-  parentId String?
-  parent   Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  Comment[] @relation("CommentReplies")
-  
-  @@map("comments")
-}
+  id               String            @id @default(cuid())
+  content          String
+  author           String
+  email            String?
+  website          String?
+  pageId           String
+  status           CommentStatus     @default(APPROVED)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  siteId           String
+  parentId         String?
+  parent           Comment?          @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          Comment[]         @relation("CommentReplies")
+  site             Site              @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  moderationTokens ModerationToken[]
 
-enum CommentStatus {
-  APPROVED  // 正常评论，直接放行
-  PENDING   // 疑似垃圾评论，待审核
-  REJECTED  // 确认垃圾评论，拒绝
+  @@map("comments")
 }
 
 model SystemConfig {
   id    String @id @default(cuid())
   key   String @unique
   value String
-  
+
   @@map("system_configs")
 }
 
 model AIConfig {
   id        String   @id @default(cuid())
-  baseUrl   String   // OpenAI 兼容 API 的基础 URL
-  model     String   // 使用的模型名称
-  apiKey    String   // API 密钥
-  isEnabled Boolean  @default(true) // 是否启用 AI 检测
+  baseUrl   String
+  model     String
+  apiKey    String
+  isEnabled Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@map("ai_configs")
 }
 
@@ -93,13 +77,31 @@ model Subscription {
   email     String
   pageId    String
   siteId    String
-  token     String   @unique // 用于退订
+  token     String   @unique
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
-  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  
+  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
   @@unique([email, pageId, siteId])
   @@map("subscriptions")
+}
+
+model ModerationToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  action    String
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  commentId String
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@map("moderation_tokens")
+}
+
+enum CommentStatus {
+  APPROVED
+  PENDING
+  REJECTED
 }

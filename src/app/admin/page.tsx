@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Trash2, Globe, MessageSquare, Settings, LogOut, Mail, Send, Edit, Code, Copy, Check, Bot } from 'lucide-react'
+import { Trash2, Globe, MessageSquare, Settings, LogOut, Mail, Send, Edit, Code, Copy, Check, Bot, CheckCircle } from 'lucide-react'
 import { Navigation } from '@/components/navigation'
 
 interface Site {
@@ -29,6 +29,7 @@ interface Comment {
   author: string
   pageId: string
   createdAt: string
+  status: 'APPROVED' | 'PENDING' | 'REJECTED'
   site: {
     hostname: string
   }
@@ -48,6 +49,7 @@ export default function AdminPage() {
   const [user, setUser] = useState<{ username: string } | null>(null)
   const [sites, setSites] = useState<Site[]>([])
   const [comments, setComments] = useState<Comment[]>([])
+  const [pendingComments, setPendingComments] = useState<Comment[]>([])
   const [aiConfig, setAiConfig] = useState<AIConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAddSite, setShowAddSite] = useState(false)
@@ -102,6 +104,18 @@ export default function AdminPage() {
     }
   }
 
+  const fetchPendingComments = async () => {
+    try {
+      const response = await fetch('/api/admin/comments?status=PENDING&limit=20')
+      if (response.ok) {
+        const data = await response.json()
+        setPendingComments(data.comments)
+      }
+    } catch (error) {
+      console.error('Error fetching pending comments:', error)
+    }
+  }
+
   useEffect(() => {
     checkAuth()
   }, [])
@@ -123,7 +137,7 @@ export default function AdminPage() {
 
   const loadData = async () => {
     setLoading(true)
-    await Promise.all([fetchSites(), fetchComments()])
+    await Promise.all([fetchSites(), fetchComments(), fetchPendingComments()])
     setLoading(false)
   }
 
@@ -283,12 +297,35 @@ export default function AdminPage() {
 
       if (response.ok) {
         fetchComments()
+        fetchPendingComments() // 刷新待审核评论列表
       } else {
         alert('删除失败')
       }
     } catch (error) {
       console.error('Error deleting comment:', error)
       alert('删除失败')
+    }
+  }
+
+  const handleApproveComment = async (commentId: string) => {
+    try {
+      const response = await fetch(`/api/admin/comments/${commentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: 'APPROVED' }),
+      })
+
+      if (response.ok) {
+        fetchComments()
+        fetchPendingComments() // 刷新待审核评论列表
+      } else {
+        alert('审核通过失败')
+      }
+    } catch (error) {
+      console.error('Error approving comment:', error)
+      alert('审核通过失败')
     }
   }
 
@@ -522,6 +559,67 @@ export default function AdminPage() {
                           </Button>
                         </div>
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* 待审核评论管理 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5" />
+                待审核评论 ({pendingComments.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingComments.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  没有待审核的评论
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {pendingComments.map((comment, index) => (
+                    <div key={comment.id}>
+                      <div className="flex items-start justify-between p-4 border rounded-lg bg-yellow-50 border-yellow-200">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                            <span className="font-medium text-foreground">{comment.author}</span>
+                            <span>•</span>
+                            <span>{comment.site.hostname}</span>
+                            <span>•</span>
+                            <span>{comment.pageId}</span>
+                            <span>•</span>
+                            <span>{formatDate(comment.createdAt)}</span>
+                            <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                              待审核
+                            </span>
+                          </div>
+                          <p className="text-sm leading-relaxed">{comment.content}</p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleApproveComment(comment.id)}
+                            className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                          >
+                            <CheckCircle className="h-4 w-4 mr-1" />
+                            通过
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {index < pendingComments.length - 1 && <Separator className="my-4" />}
                     </div>
                   ))}
                 </div>

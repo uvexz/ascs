@@ -1,3 +1,6 @@
+-- CreateEnum
+CREATE TYPE "public"."CommentStatus" AS ENUM ('APPROVED', 'PENDING', 'REJECTED');
+
 -- CreateTable
 CREATE TABLE "public"."users" (
     "id" TEXT NOT NULL,
@@ -16,6 +19,7 @@ CREATE TABLE "public"."sites" (
     "hostname" TEXT NOT NULL,
     "name" TEXT,
     "description" TEXT,
+    "alternateHostnames" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -30,6 +34,7 @@ CREATE TABLE "public"."comments" (
     "email" TEXT,
     "website" TEXT,
     "pageId" TEXT NOT NULL,
+    "status" "public"."CommentStatus" NOT NULL DEFAULT 'APPROVED',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "siteId" TEXT NOT NULL,
@@ -48,6 +53,19 @@ CREATE TABLE "public"."system_configs" (
 );
 
 -- CreateTable
+CREATE TABLE "public"."ai_configs" (
+    "id" TEXT NOT NULL,
+    "baseUrl" TEXT NOT NULL,
+    "model" TEXT NOT NULL,
+    "apiKey" TEXT NOT NULL,
+    "isEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "ai_configs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "public"."subscriptions" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
@@ -59,6 +77,19 @@ CREATE TABLE "public"."subscriptions" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "subscriptions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "public"."moderation_tokens" (
+    "id" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "action" TEXT NOT NULL,
+    "isUsed" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "commentId" TEXT NOT NULL,
+
+    CONSTRAINT "moderation_tokens_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -79,6 +110,9 @@ CREATE UNIQUE INDEX "subscriptions_token_key" ON "public"."subscriptions"("token
 -- CreateIndex
 CREATE UNIQUE INDEX "subscriptions_email_pageId_siteId_key" ON "public"."subscriptions"("email", "pageId", "siteId");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "moderation_tokens_token_key" ON "public"."moderation_tokens"("token");
+
 -- AddForeignKey
 ALTER TABLE "public"."comments" ADD CONSTRAINT "comments_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "public"."sites"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -87,3 +121,6 @@ ALTER TABLE "public"."comments" ADD CONSTRAINT "comments_parentId_fkey" FOREIGN 
 
 -- AddForeignKey
 ALTER TABLE "public"."subscriptions" ADD CONSTRAINT "subscriptions_siteId_fkey" FOREIGN KEY ("siteId") REFERENCES "public"."sites"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "public"."moderation_tokens" ADD CONSTRAINT "moderation_tokens_commentId_fkey" FOREIGN KEY ("commentId") REFERENCES "public"."comments"("id") ON DELETE CASCADE ON UPDATE CASCADE;

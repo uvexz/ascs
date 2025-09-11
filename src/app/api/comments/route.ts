@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
 
         return createCorsResponse({
           ...comment,
-          message: 'Comment submitted for moderation'
+          message: '您的评论需要管理员审核'
         }, { status: 201 })
       }
     }

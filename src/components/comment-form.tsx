@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import Cookies from 'js-cookie'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -33,6 +34,8 @@ export function CommentForm({
   const [content, setContent] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null)
+  const [submitMessageType, setSubmitMessageType] = useState<'success' | 'error' | 'warning'>('success')
 
   // 从 cookies 加载用户信息
   useEffect(() => {
@@ -86,13 +89,22 @@ export function CommentForm({
       })
 
       if (response.ok) {
+        const result = await response.json()
         saveUserInfo() // 保存用户信息到 cookies
         setContent('') // 只清空评论内容，保留用户信息
-        onCommentAdded()
-        if (onCancel) onCancel()
+        
+        // 根据返回的消息类型显示不同的提示
+        if (result.message && result.message.includes('需要管理员审核')) {
+          setSubmitMessage(result.message)
+          setSubmitMessageType('warning')
+        } else {
+          onCommentAdded()
+          if (onCancel) onCancel()
+        }
       } else {
         const error = await response.json()
-        alert(error.error || '提交失败，请重试')
+        setSubmitMessage(error.error || '提交失败，请重试')
+        setSubmitMessageType('error')
       }
     } catch (error) {
       console.error('Error submitting comment:', error)
@@ -110,6 +122,13 @@ export function CommentForm({
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {submitMessage && (
+          <Alert className={`mb-4 ${submitMessageType === 'error' ? 'border-red-200 bg-red-50' : submitMessageType === 'warning' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
+            <AlertDescription>
+              {submitMessage}
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input

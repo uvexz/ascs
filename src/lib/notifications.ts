@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { prisma } from './prisma'
+import { generateModerationLinks } from './moderation-tokens'
 import crypto from 'crypto'
 
 interface NotificationConfig {
@@ -311,6 +312,9 @@ export async function notifyPendingComment(
     name?: string
   }
 ) {
+  // 生成审核和删除链接（使用一次性代码）
+  const { approveUrl, deleteUrl } = await generateModerationLinks(comment.id)
+  
   // 发送管理员待审核通知
   const adminMessage = `
 ⚠️ 评论待审核通知
@@ -320,7 +324,11 @@ export async function notifyPendingComment(
 作者: ${comment.author}
 内容: ${comment.content.substring(0, 100)}${comment.content.length > 100 ? '...' : ''}
 
-请访问管理后台审核此评论。
+操作链接:
+✅ 通过审核: ${approveUrl}
+❌ 删除评论: ${deleteUrl}
+
+请点击链接审核此评论。链接24小时内有效，使用后即失效。
   `.trim()
 
   await sendTelegramNotification(adminMessage)
