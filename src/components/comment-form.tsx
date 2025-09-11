@@ -22,12 +22,12 @@ interface CommentFormProps {
   onCancel?: () => void
 }
 
-export function CommentForm({ 
-  siteId, 
-  pageId, 
-  parentId, 
-  onCommentAdded, 
-  onCancel 
+export function CommentForm({
+  siteId,
+  pageId,
+  parentId,
+  onCommentAdded,
+  onCancel
 }: CommentFormProps) {
   const [author, setAuthor] = useState('')
   const [email, setEmail] = useState('')
@@ -64,7 +64,7 @@ export function CommentForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!author.trim() || !content.trim()) {
       alert('请填写姓名和评论内容')
       return
@@ -93,7 +93,7 @@ export function CommentForm({
         const result = await response.json()
         saveUserInfo() // 保存用户信息到 cookies
         setContent('') // 只清空评论内容，保留用户信息
-        
+
         // 根据返回的消息类型显示不同的提示
         if (result.message && result.message.includes('需要管理员审核')) {
           setSubmitMessage(result.message)
@@ -177,10 +177,46 @@ export function CommentForm({
             <TabsContent value="preview" className="mt-2">
               <div className="min-h-[150px] p-4 border rounded-md bg-muted/50">
                 {content ? (
-                  <div className="prose prose-sm prose-a:text-sky-600 prose-a:no-underline hover:prose-a:text-sky-500 prose-ul:list-outside prose-table:border prose-th:border prose-th:p-2 prose-td:border prose-td:p-2 prose-img:rounded-xl prose-img:border prose-h1:text-slate-600 prose-h2:text-slate-600 prose-h3:text-slate-600 prose-h4:text-slate-600 prose-h5:text-slate-600 prose-blockquote:text-slate-500 max-w-none dark:prose-invert">
+                  <div className="prose prose-sm max-w-none">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        // 自定义组件渲染
+                        p: ({ children }) => <p className="my-2">{children}</p>,
+                        h1: ({ children }) => <h1 className="text-lg font-semibold my-2">{children}</h1>,
+                        h2: ({ children }) => <h2 className="text-base font-semibold my-2">{children}</h2>,
+                        h3: ({ children }) => <h3 className="text-sm font-semibold my-2">{children}</h3>,
+                        code: ({ inline, children, ...props }) => {
+                          if (inline) {
+                            return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                          }
+                          return <code {...props}>{children}</code>
+                        },
+                        pre: ({ children }) => (
+                          <pre className="bg-muted p-3 rounded-md overflow-x-auto my-2 text-xs">
+                            {children}
+                          </pre>
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-border pl-4 my-2 text-muted-foreground italic">
+                            {children}
+                          </blockquote>
+                        ),
+                        ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li className="text-sm">{children}</li>,
+                        a: ({ href, children }) => (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {children}
+                          </a>
+                        ),
+                      }}
                     >
                       {content}
                     </ReactMarkdown>
