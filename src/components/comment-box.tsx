@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { CommentForm } from './comment-form'
 import { CommentList } from './comment-list'
 import { MessageSquare } from 'lucide-react'
@@ -107,6 +109,14 @@ export function CommentBox({ siteId, pageId }: CommentBoxProps) {
         pageId={pageId}
         onCommentAdded={handleCommentAdded}
       />
+
+      <div className="flex justify-center gap-4">
+        <Button variant="link" asChild className="text-xs font-normal text-muted-foreground">
+          <Link href="https://github.com/uvexz/ascs" target='_blank'>
+              A SIMPLE COMMENT SYSTEM
+          </Link>
+        </Button>
+        </div>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -165,7 +166,12 @@ export function CommentForm({
                 className="resize-none"
               />
               <div className="mt-2 text-xs text-muted-foreground">
-                支持 Markdown 格式：**粗体** *斜体* `代码` [链接](url) &gt; 引用
+                支持 Markdown 格式：
+                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>**粗体**</Badge>
+                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>*斜体*</Badge>
+                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>`代码`</Badge>
+                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>[链接](url)</Badge>
+                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>&gt; 引用</Badge>
               </div>
             </TabsContent>
             <TabsContent value="preview" className="mt-2">
