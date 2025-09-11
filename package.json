@@ -10,6 +10,8 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@cap.js/server": "^3.0.1",
+    "@cap.js/widget": "^0.1.28",
     "@prisma/client": "^6.16.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-label": "^2.1.7",

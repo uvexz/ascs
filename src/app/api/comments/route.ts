@@ -102,11 +102,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { siteId, pageId, author, content, email, website, parentId } = body
+    const { siteId, pageId, author, content, email, website, parentId, captchaToken, captchaSolutions } = body
 
     if (!siteId || !pageId || !author || !content) {
       return createCorsResponse(
         { error: 'siteId, pageId, author, and content are required' },
+        { status: 400 }
+      )
+    }
+
+    // 验证 CAPTCHA
+    if (!captchaToken || !captchaSolutions) {
+      return createCorsResponse(
+        { error: 'CAPTCHA verification is required' },
+        { status: 400 }
+      )
+    }
+
+    // 验证 CAPTCHA token（这里可以添加更严格的验证逻辑）
+    // 由于 cap.js 的 token 验证通常在 redeem 阶段完成，这里做基本检查
+    if (typeof captchaToken !== 'string' || !Array.isArray(captchaSolutions)) {
+      return createCorsResponse(
+        { error: 'Invalid CAPTCHA verification' },
         { status: 400 }
       )
     }

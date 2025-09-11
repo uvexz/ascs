@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@cap.js/server':
+        specifier: ^3.0.1
+        version: 3.0.1
+      '@cap.js/widget':
+        specifier: ^0.1.28
+        version: 0.1.28
       '@prisma/client':
         specifier: ^6.16.0
         version: 6.16.0(prisma@6.16.0(typescript@5.9.2))(typescript@5.9.2)
@@ -250,6 +256,12 @@ packages:
   '@aws-sdk/xml-builder@3.873.0':
     resolution: {integrity: sha512-kLO7k7cGJ6KaHiExSJWojZurF7SnGMDHXRuQunFnEoD0n1yB6Lqy/S/zHiQ7oJnBhPr9q0TW9qFkrsZb1Uc54w==}
     engines: {node: '>=18.0.0'}
+
+  '@cap.js/server@3.0.1':
+    resolution: {integrity: sha512-dt6TKVDsFUOEoFUNVpPAOjvpPjAhuI+9AuJZdSiGD01a2/Me7TBcuq431dqqIUMqhFrjGRjt4hahurKcB5dXeA==}
+
+  '@cap.js/widget@0.1.28':
+    resolution: {integrity: sha512-YIOVLUXOE2uNvlg1SbL/ZuzTatwqA3GIvdPpbv6X4YCRIcWijQwzEAiEcHBPJpwkMNTHxi70mSinDwNSgRzpkA==}
 
   '@emnapi/core@1.5.0':
     resolution: {integrity: sha512-sbP8GzB1WDzacS8fgNPpHlp6C9VZe+SJP3F90W9rLemaQj2PzIuTEl1qDOYQf58YIpyjViI24y9aPWCjEzY2cg==}
@@ -1068,6 +1080,9 @@ packages:
 
   '@types/node@20.19.13':
     resolution: {integrity: sha512-yCAeZl7a0DxgNVteXFHt9+uyFbqXGy/ShC4BlcHkoE0AfGXYv/BUiplV72DjMYXHDBXFjhvr6DD1NiRVfB4j8g==}
+
+  '@types/node@22.18.1':
+    resolution: {integrity: sha512-rzSDyhn4cYznVG+PCzGe1lwuMYJrcBS1fc3JqSa2PvtABwWo+dZ1ij5OVok3tqfpEBCBoaR4d7upFJk73HRJDw==}
 
   '@types/nodemailer@7.0.1':
     resolution: {integrity: sha512-UfHAghPmGZVzaL8x9y+mKZMWyHC399+iq0MOmya5tIyenWX3lcdSb60vOmp0DocR6gCDTYTozv/ULQnREyyjkg==}
@@ -3317,6 +3332,13 @@ snapshots:
       '@smithy/types': 4.5.0
       tslib: 2.8.1
 
+  '@cap.js/server@3.0.1':
+    dependencies:
+      '@types/node': 22.18.1
+      typescript: 5.9.2
+
+  '@cap.js/widget@0.1.28': {}
+
   '@emnapi/core@1.5.0':
     dependencies:
       '@emnapi/wasi-threads': 1.1.0
@@ -4149,6 +4171,10 @@ snapshots:
   '@types/ms@2.1.0': {}
 
   '@types/node@20.19.13':
+    dependencies:
+      undici-types: 6.21.0
+
+  '@types/node@22.18.1':
     dependencies:
       undici-types: 6.21.0
 

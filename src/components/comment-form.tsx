@@ -14,6 +14,13 @@ import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github.css'
 
+// 声明全局 Cap 类型
+declare global {
+  interface Window {
+    Cap: any
+  }
+}
+
 interface CommentFormProps {
   siteId: string
   pageId: string
@@ -37,6 +44,9 @@ export function CommentForm({
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
   const [submitMessage, setSubmitMessage] = useState<string | null>(null)
   const [submitMessageType, setSubmitMessageType] = useState<'success' | 'error' | 'warning'>('success')
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaSolutions, setCaptchaSolutions] = useState<any>(null)
+  const [captchaLoaded, setCaptchaLoaded] = useState(false)
 
   // 从 cookies 加载用户信息
   useEffect(() => {
@@ -48,6 +58,104 @@ export function CommentForm({
     if (savedEmail) setEmail(savedEmail)
     if (savedWebsite) setWebsite(savedWebsite)
   }, [])
+
+  // 加载 Cap.js 脚本
+  useEffect(() => {
+    const loadCapScript = () => {
+      if (window.Cap) {
+        setCaptchaLoaded(true)
+        return
+      }
+
+      // 设置 WASM URL（如果需要）
+      // (window as any).CAP_CUSTOM_WASM_URL = 'https://cdn.jsdelivr.net/npm/@cap.js/widget/cap_wasm_bg.wasm'
+
+      const script = document.createElement('script')
+      script.src = 'https://use.sevencdn.com/npm/@cap.js/widget'
+      script.onload = () => {
+        console.log('Cap.js script loaded successfully')
+        setCaptchaLoaded(true)
+      }
+      script.onerror = () => {
+        console.error('Failed to load Cap.js script')
+        setSubmitMessage('无法加载验证组件')
+        setSubmitMessageType('error')
+      }
+      document.head.appendChild(script)
+    }
+
+    loadCapScript()
+  }, [])
+
+  // 初始化 CAPTCHA
+  const [capInstance, setCapInstance] = useState<any>(null)
+  const [isCapSolving, setIsCapSolving] = useState(false)
+
+  useEffect(() => {
+    if (captchaLoaded && !capInstance) {
+      try {
+        // 使用 invisible mode
+        const cap = new (window as any).Cap({
+          apiEndpoint: '/api/'
+        })
+
+        cap.addEventListener('progress', (e: any) => {
+          console.log('CAPTCHA progress:', e.detail.progress + '%')
+        })
+
+        cap.addEventListener('error', (e: any) => {
+          console.error('CAPTCHA error:', e.detail)
+          setSubmitMessage(`CAPTCHA 错误: ${e.detail.message || 'Unknown error'}`)
+          setSubmitMessageType('error')
+          setIsCapSolving(false)
+        })
+
+        setCapInstance(cap)
+      } catch (error) {
+        console.error('Failed to create Cap instance:', error)
+        setSubmitMessage('无法初始化验证组件')
+        setSubmitMessageType('error')
+      }
+    }
+  }, [captchaLoaded, capInstance])
+
+  // 手动触发 CAPTCHA 解决
+  const solveCaptcha = async () => {
+    if (!capInstance || isCapSolving) return
+
+    setIsCapSolving(true)
+    setSubmitMessage('正在进行安全验证...')
+    setSubmitMessageType('success')
+
+    try {
+      const result = await capInstance.solve()
+      console.log('CAPTCHA solved:', result)
+      setCaptchaToken(result.token)
+      setCaptchaSolutions(result.solutions || [])
+
+      // 显示成功消息
+      setSubmitMessage('验证完成')
+      setSubmitMessageType('success')
+
+      // 3秒后自动隐藏成功消息
+      setTimeout(() => {
+        setSubmitMessage(null)
+      }, 3000)
+
+    } catch (error) {
+      console.error('CAPTCHA solve error:', error)
+      setSubmitMessage('验证失败，请重试')
+      setSubmitMessageType('error')
+    } finally {
+      setIsCapSolving(false)
+    }
+  }
+
+  // 重置 CAPTCHA
+  const resetCaptcha = () => {
+    setCaptchaToken(null)
+    setCaptchaSolutions(null)
+  }
 
   // 保存用户信息到 cookies
   const saveUserInfo = () => {
@@ -66,7 +174,14 @@ export function CommentForm({
     e.preventDefault()
 
     if (!author.trim() || !content.trim()) {
-      alert('请填写姓名和评论内容')
+      setSubmitMessage('请填写姓名和评论内容')
+      setSubmitMessageType('error')
+      return
+    }
+
+    if (!captchaToken || !captchaSolutions) {
+      setSubmitMessage('请完成 CAPTCHA 验证')
+      setSubmitMessageType('error')
       return
     }
 
@@ -86,6 +201,8 @@ export function CommentForm({
           website: website.trim() || undefined,
           content: content.trim(),
           parentId,
+          captchaToken,
+          captchaSolutions,
         }),
       })
 
@@ -102,6 +219,9 @@ export function CommentForm({
           onCommentAdded()
           if (onCancel) onCancel()
         }
+
+        // 重置 CAPTCHA
+        resetCaptcha()
       } else {
         const error = await response.json()
         setSubmitMessage(error.error || '提交失败，请重试')
@@ -109,7 +229,8 @@ export function CommentForm({
       }
     } catch (error) {
       console.error('Error submitting comment:', error)
-      alert('提交失败，请重试')
+      setSubmitMessage('提交失败，请重试')
+      setSubmitMessageType('error')
     } finally {
       setIsSubmitting(false)
     }
@@ -187,11 +308,8 @@ export function CommentForm({
                         h1: ({ children }) => <h1 className="text-lg font-semibold my-2">{children}</h1>,
                         h2: ({ children }) => <h2 className="text-base font-semibold my-2">{children}</h2>,
                         h3: ({ children }) => <h3 className="text-sm font-semibold my-2">{children}</h3>,
-                        code: ({ inline, children, ...props }) => {
-                          if (inline) {
-                            return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
-                          }
-                          return <code {...props}>{children}</code>
+                        code: ({ children, ...props }: any) => {
+                          return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
                         },
                         pre: ({ children }) => (
                           <pre className="bg-muted p-3 rounded-md overflow-x-auto my-2 text-xs">
@@ -229,10 +347,28 @@ export function CommentForm({
               </div>
             </TabsContent>
           </Tabs>
+
+
+
+          {/* 按钮区域 */}
           <div className="flex gap-2">
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? '提交中...' : '提交评论'}
-            </Button>
+            {!captchaLoaded ? (
+              <Button type="button" disabled>
+                正在加载验证组件...
+              </Button>
+            ) : !captchaToken ? (
+              <Button
+                type="button"
+                onClick={solveCaptcha}
+                disabled={isCapSolving}
+              >
+                {isCapSolving ? '验证中...' : '开始安全验证'}
+              </Button>
+            ) : (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? '提交中...' : '提交评论'}
+              </Button>
+            )}
             {onCancel && (
               <Button type="button" variant="outline" onClick={onCancel}>
                 取消
