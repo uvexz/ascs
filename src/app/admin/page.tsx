@@ -180,53 +180,21 @@ export default function AdminPage() {
     }
   }
 
-  const handleAIConfigSave = async () => {
+  const handleSaveAllConfigs = async () => {
     try {
+      setConfigLoading(true)
       setAiConfigLoading(true)
       setConfigError('')
       setConfigSuccess('')
 
-      if (!aiConfig || !aiConfig.baseUrl || !aiConfig.model || !aiConfig.apiKey) {
-        setConfigError('请填写所有必填字段')
+      // 验证 AI 配置
+      if (aiConfig?.isEnabled && (!aiConfig.baseUrl || !aiConfig.model || !aiConfig.apiKey)) {
+        setConfigError('启用 AI 反垃圾评论功能时，请填写所有 AI 配置字段')
         return
       }
 
-      const response = await fetch('/api/admin/ai-config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          baseUrl: aiConfig.baseUrl,
-          model: aiConfig.model,
-          apiKey: aiConfig.apiKey,
-          isEnabled: aiConfig.isEnabled,
-        }),
-      })
-
-      if (response.ok) {
-        const savedConfig = await response.json()
-        setAiConfig(savedConfig)
-        setConfigSuccess('AI 配置保存成功！')
-        setTimeout(() => setConfigSuccess(''), 3000)
-      } else {
-        const data = await response.json()
-        setConfigError(data.error || '保存失败')
-      }
-    } catch (error) {
-      setConfigError('保存失败，请重试')
-    } finally {
-      setAiConfigLoading(false)
-    }
-  }
-
-  const handleConfigSave = async () => {
-    try {
-      setConfigLoading(true)
-      setConfigError('')
-      setConfigSuccess('')
-
-      const response = await fetch('/api/admin/config', {
+      // 保存普通配置
+      const configResponse = await fetch('/api/admin/config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -234,17 +202,44 @@ export default function AdminPage() {
         body: JSON.stringify(config),
       })
 
-      if (response.ok) {
-        setConfigSuccess('配置保存成功！')
-        setTimeout(() => setConfigSuccess(''), 3000)
-      } else {
-        const data = await response.json()
-        setConfigError(data.error || '保存失败')
+      if (!configResponse.ok) {
+        const data = await configResponse.json()
+        setConfigError(data.error || '配置保存失败')
+        return
       }
+
+      // 如果有 AI 配置，保存 AI 配置
+      if (aiConfig) {
+        const aiResponse = await fetch('/api/admin/ai-config', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            baseUrl: aiConfig.baseUrl,
+            model: aiConfig.model,
+            apiKey: aiConfig.apiKey,
+            isEnabled: aiConfig.isEnabled,
+          }),
+        })
+
+        if (aiResponse.ok) {
+          const savedAIConfig = await aiResponse.json()
+          setAiConfig(savedAIConfig)
+        } else {
+          const data = await aiResponse.json()
+          setConfigError(data.error || 'AI 配置保存失败')
+          return
+        }
+      }
+
+      setConfigSuccess('所有配置保存成功！')
+      setTimeout(() => setConfigSuccess(''), 3000)
     } catch (error) {
       setConfigError('保存失败，请重试')
     } finally {
       setConfigLoading(false)
+      setAiConfigLoading(false)
     }
   }
 
@@ -1123,11 +1118,8 @@ export default function AdminPage() {
                   <Button variant="outline" onClick={() => setShowConfig(false)}>
                     取消
                   </Button>
-                  <Button onClick={handleConfigSave} disabled={configLoading}>
-                    {configLoading ? '保存中...' : '保存配置'}
-                  </Button>
-                  <Button onClick={handleAIConfigSave} disabled={aiConfigLoading}>
-                    {aiConfigLoading ? '保存 AI 配置中...' : (aiConfig ? '保存 AI 配置' : '创建 AI 配置')}
+                  <Button onClick={handleSaveAllConfigs} disabled={configLoading || aiConfigLoading}>
+                    {configLoading || aiConfigLoading ? '保存中...' : '保存所有配置'}
                   </Button>
                 </div>
               </CardContent>

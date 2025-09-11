@@ -41,31 +41,9 @@ export class AIDetectionService {
     }
 
     try {
-      const prompt = `
-你是一个反垃圾评论系统助手。请分析下面的评论内容，评估其为垃圾评论的风险度。
+      const userPrompt = `你是一个反垃圾评论系统助手。请分析下面的评论内容，评估其为垃圾评论的风险度。评论内容: ${content} 作者: ${author} 邮箱: ${email || '未提供'} 网站: ${website || '未提供'} 评估标准：1. 广告或推广内容2. 无意义或重复内容3. 包含恶意链接4. 包含不当或攻击性言论5. 明显的机器生成内容6. 但不要对无网址的评论太严格，以避免屏蔽了正常用户的评论。 请只返回一个 0-1 之间的数字，表示垃圾评论的风险度：- 0.0-0.3：正常评论，风险很低 - 0.3-0.7：可能有问题，需要进一步检查 - 0.7-1.0：很可能是垃圾评论 只返回数字，不要包含任何其他文本或解释。`
 
-评论内容: "${content}"
-作者: ${author}
-邮箱: ${email || '未提供'}
-网站: ${website || '未提供'}
-
-评估标准：
-1. 广告或推广内容
-2. 无意义或重复内容
-3. 包含恶意链接
-4. 包含不当或攻击性言论
-5. 明显的机器生成内容
-6. 但不要对无网址的评论太严格，以避免屏蔽了正常用户的评论
-
-请只返回一个 0-1 之间的数字，表示垃圾评论的风险度：
-- 0.0-0.3：正常评论，风险很低
-- 0.3-0.7：可能有问题，需要进一步检查
-- 0.7-1.0：很可能是垃圾评论
-
-只返回数字，不要包含任何其他文本或解释。
-`
-
-      const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+      const response = await fetch(`${this.config.baseUrl}/v1/chat/completions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,27 +51,23 @@ export class AIDetectionService {
         },
         body: JSON.stringify({
           model: this.config.model,
-          stream: false,
-          thinking: {
-            type: "disabled"
-          },
-          do_sample: true,
-          temperature: 0.6,
-          top_p: 0.95,
-          response_format: {
-            type: "text"
-          },
           messages: [
             { role: 'system', content: '你是一个反垃圾评论助手，只返回0-1之间的数字表示风险度。' },
-            { role: 'user', content: prompt }
+            { role: 'user', content: userPrompt }
           ],
-          max_tokens: 50,
+          temperature: 0,
+          max_tokens: 500
         }),
       })
 
       if (!response.ok) {
         console.error('AI detection API error:', response.statusText)
-        return { isSpam: false, confidence: 0 }
+        // 若 AI 无反应或回复错误，请总是将评论的风险设置为 0.5
+        return {
+          isSpam: false,
+          confidence: 0.5,
+          reason: 'AI API 调用失败，默认风险度设置为 0.5'
+        }
       }
 
       const data = await response.json()
@@ -101,7 +75,12 @@ export class AIDetectionService {
       // 检查响应结构
       if (!data.choices || !data.choices[0] || !data.choices[0].message) {
         console.error('Invalid AI API response structure')
-        return { isSpam: false, confidence: 0 }
+        // 若 AI 无反应或回复错误，请总是将评论的风险设置为 0.5
+        return {
+          isSpam: false,
+          confidence: 0.5,
+          reason: 'AI API 响应结构无效，默认风险度设置为 0.5'
+        }
       }
       
       let messageContent = data.choices[0].message.content?.trim() || ''
@@ -111,40 +90,20 @@ export class AIDetectionService {
         messageContent = data.choices[0].message.reasoning_content.trim()
       }
       
-      // 尝试从响应中提取数字
-      let riskScore = 0
+      // 简化数字提取逻辑，直接匹配小数格式
+      let riskScore = 0.5 // 默认值
       
-      // 尝试多种正则表达式模式匹配数字
-      const patterns = [
-        /\d+\.\d+/,         // 匹配任意小数，如 1.0, 0.5, 0.9
-        /\b\d\.\d+\b/,      // 匹配单词边界的小数
-        /\.\d+/,            // 匹配以小数点开头的数字，如 .5, .9
-        /\b\d\b/,           // 匹配单词边界的整数，如 0, 1
-        /\d+\.?\d*/,        // 匹配任意数字（包括整数）
-      ]
-      
-      let numberMatch = null
-      for (const pattern of patterns) {
-        numberMatch = messageContent.match(pattern)
-        if (numberMatch) {
-          break
-        }
-      }
+      // 尝试匹配 0.x 或 x.x 格式的数字
+      const numberMatch = messageContent.match(/\b0?\.\d+\b/)
       
       if (numberMatch) {
         riskScore = parseFloat(numberMatch[0])
         // 确保数字在 0-1 范围内
         riskScore = Math.max(0, Math.min(1, riskScore))
       } else {
+        // 如果无法提取数字，设置为默认值 0.5
         console.error('Failed to extract risk score from AI response:', messageContent)
-        // 尝试提取所有数字
-        const allNumbers = messageContent.match(/\d+\.?\d*/g)
-        if (allNumbers && allNumbers.length > 0) {
-          riskScore = parseFloat(allNumbers[0])
-          riskScore = Math.max(0, Math.min(1, riskScore))
-        } else {
-          riskScore = 0
-        }
+        riskScore = 0.5
       }
 
       // 根据风险度判断是否为垃圾评论
@@ -161,7 +120,12 @@ export class AIDetectionService {
       }
     } catch (error) {
       console.error('AI detection error:', error)
-      return { isSpam: false, confidence: 0 }
+      // 若 AI 无反应或回复错误，请总是将评论的风险设置为 0.5
+      return {
+        isSpam: false,
+        confidence: 0.5,
+        reason: 'AI 检测出错，默认风险度设置为 0.5'
+      }
     }
   }
 
