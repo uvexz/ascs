@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
       
       if (isSpam) {
         // 确认垃圾评论，直接拒绝
-        console.log(`Spam comment rejected from ${author}: ${content}`)
         return createCorsResponse(
           { error: 'Comment rejected as spam' },
           { status: 400 }

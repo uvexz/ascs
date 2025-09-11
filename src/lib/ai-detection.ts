@@ -72,12 +72,21 @@ export class AIDetectionService {
         },
         body: JSON.stringify({
           model: this.config.model,
+          stream: false,
+          thinking: {
+            type: "disabled"
+          },
+          do_sample: true,
+          temperature: 0.6,
+          top_p: 0.95,
+          response_format: {
+            type: "text"
+          },
           messages: [
-            { role: 'system', content: '你是一个专业的反垃圾评论助手，只返回0-1之间的数字表示风险度。' },
+            { role: 'system', content: '你是一个反垃圾评论助手，只返回0-1之间的数字表示风险度。' },
             { role: 'user', content: prompt }
           ],
-          temperature: 0.1,
-          max_tokens: 10,
+          max_tokens: 50,
         }),
       })
 
@@ -94,18 +103,47 @@ export class AIDetectionService {
         return { isSpam: false, confidence: 0 }
       }
       
-      const messageContent = data.choices[0].message.content.trim()
+      let messageContent = data.choices[0].message.content?.trim() || ''
+      
+      // 如果 content 为空，尝试从 reasoning_content 获取
+      if (!messageContent && data.choices[0].message.reasoning_content) {
+        messageContent = data.choices[0].message.reasoning_content.trim()
+      }
       
       // 尝试从响应中提取数字
       let riskScore = 0
-      const numberMatch = messageContent.match(/0?\.\d+|[01]/)
+      
+      // 尝试多种正则表达式模式匹配数字
+      const patterns = [
+        /\d+\.\d+/,         // 匹配任意小数，如 1.0, 0.5, 0.9
+        /\b\d\.\d+\b/,      // 匹配单词边界的小数
+        /\.\d+/,            // 匹配以小数点开头的数字，如 .5, .9
+        /\b\d\b/,           // 匹配单词边界的整数，如 0, 1
+        /\d+\.?\d*/,        // 匹配任意数字（包括整数）
+      ]
+      
+      let numberMatch = null
+      for (const pattern of patterns) {
+        numberMatch = messageContent.match(pattern)
+        if (numberMatch) {
+          break
+        }
+      }
+      
       if (numberMatch) {
         riskScore = parseFloat(numberMatch[0])
         // 确保数字在 0-1 范围内
         riskScore = Math.max(0, Math.min(1, riskScore))
       } else {
         console.error('Failed to extract risk score from AI response:', messageContent)
-        return { isSpam: false, confidence: 0 }
+        // 尝试提取所有数字
+        const allNumbers = messageContent.match(/\d+\.?\d*/g)
+        if (allNumbers && allNumbers.length > 0) {
+          riskScore = parseFloat(allNumbers[0])
+          riskScore = Math.max(0, Math.min(1, riskScore))
+        } else {
+          riskScore = 0
+        }
       }
 
       // 根据风险度判断是否为垃圾评论
@@ -131,7 +169,6 @@ export class AIDetectionService {
     
     if (detectionResult.confidence > 0.7) {
       // 高风险度垃圾评论，直接拒绝
-      console.log(`Spam comment detected: ${detectionResult.reason}`)
       return true
     }
     
@@ -143,7 +180,6 @@ export class AIDetectionService {
     
     if (detectionResult.confidence > 0.3 && detectionResult.confidence <= 0.7) {
       // 中等风险度，需要人工审核
-      console.log(`Comment needs moderation: ${detectionResult.reason}`)
       return true
     }
     
