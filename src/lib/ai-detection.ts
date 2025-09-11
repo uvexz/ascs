@@ -42,28 +42,26 @@ export class AIDetectionService {
 
     try {
       const prompt = `
-你是一个反垃圾评论系统助手。请分析下面的评论内容，判断是否为垃圾评论。
+你是一个反垃圾评论系统助手。请分析下面的评论内容，评估其为垃圾评论的风险度。
 
 评论内容: "${content}"
 作者: ${author}
 邮箱: ${email || '未提供'}
 网站: ${website || '未提供'}
 
-请根据以下标准判断：
+评估标准：
 1. 广告或推广内容
 2. 无意义或重复内容
 3. 包含恶意链接
 4. 包含不当或攻击性言论
 5. 明显的机器生成内容
 
-请以 JSON 格式回复，包含以下字段：
-{
-  "isSpam": true/false,
-  "confidence": 0-1之间的置信度,
-  "reason": "判断原因（如果isSpam为true）"
-}
+请只返回一个 0-1 之间的数字，表示垃圾评论的风险度：
+- 0.0-0.3：正常评论，风险很低
+- 0.3-0.7：可能有问题，需要进一步检查
+- 0.7-1.0：很可能是垃圾评论
 
-只返回 JSON 格式，不要包含其他文本。
+只返回数字，不要包含任何其他文本或解释。
 `
 
       const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
@@ -75,11 +73,11 @@ export class AIDetectionService {
         body: JSON.stringify({
           model: this.config.model,
           messages: [
-            { role: 'system', content: '你是一个专业的反垃圾评论助手，只返回JSON格式的结果。' },
+            { role: 'system', content: '你是一个专业的反垃圾评论助手，只返回0-1之间的数字表示风险度。' },
             { role: 'user', content: prompt }
           ],
           temperature: 0.1,
-          max_tokens: 200,
+          max_tokens: 10,
         }),
       })
 
@@ -89,12 +87,38 @@ export class AIDetectionService {
       }
 
       const data = await response.json()
-      const aiResult = JSON.parse(data.choices[0].message.content)
+      
+      // 检查响应结构
+      if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+        console.error('Invalid AI API response structure')
+        return { isSpam: false, confidence: 0 }
+      }
+      
+      const messageContent = data.choices[0].message.content.trim()
+      
+      // 尝试从响应中提取数字
+      let riskScore = 0
+      const numberMatch = messageContent.match(/0?\.\d+|[01]/)
+      if (numberMatch) {
+        riskScore = parseFloat(numberMatch[0])
+        // 确保数字在 0-1 范围内
+        riskScore = Math.max(0, Math.min(1, riskScore))
+      } else {
+        console.error('Failed to extract risk score from AI response:', messageContent)
+        return { isSpam: false, confidence: 0 }
+      }
+
+      // 根据风险度判断是否为垃圾评论
+      const isSpam = riskScore > 0.7
+      const confidence = riskScore
+      const reason = riskScore > 0.7 ? `高风险评论 (${riskScore.toFixed(2)})` :
+                    riskScore > 0.3 ? `中风险评论 (${riskScore.toFixed(2)})` :
+                    `低风险评论 (${riskScore.toFixed(2)})`
 
       return {
-        isSpam: aiResult.isSpam,
-        confidence: aiResult.confidence,
-        reason: aiResult.reason
+        isSpam,
+        confidence,
+        reason
       }
     } catch (error) {
       console.error('AI detection error:', error)
@@ -105,8 +129,8 @@ export class AIDetectionService {
   async isSpamComment(content: string, author: string, email?: string, website?: string): Promise<boolean> {
     const detectionResult = await this.detectSpam(content, author, email, website)
     
-    if (detectionResult.isSpam && detectionResult.confidence > 0.8) {
-      // 高置信度垃圾评论，直接拒绝
+    if (detectionResult.confidence > 0.7) {
+      // 高风险度垃圾评论，直接拒绝
       console.log(`Spam comment detected: ${detectionResult.reason}`)
       return true
     }
@@ -117,8 +141,8 @@ export class AIDetectionService {
   async needsModeration(content: string, author: string, email?: string, website?: string): Promise<boolean> {
     const detectionResult = await this.detectSpam(content, author, email, website)
     
-    if (detectionResult.isSpam && detectionResult.confidence > 0.5 && detectionResult.confidence <= 0.8) {
-      // 中等置信度，需要人工审核
+    if (detectionResult.confidence > 0.3 && detectionResult.confidence <= 0.7) {
+      // 中等风险度，需要人工审核
       console.log(`Comment needs moderation: ${detectionResult.reason}`)
       return true
     }
