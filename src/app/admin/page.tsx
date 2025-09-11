@@ -1051,7 +1051,7 @@ export default function AdminPage() {
                       <Label htmlFor="ai_base_url">API 基础 URL</Label>
                       <Input
                         id="ai_base_url"
-                        placeholder="https://api.openai.com/v1"
+                        placeholder="https://api.gmi-serving.com"
                         value={aiConfig?.baseUrl || ''}
                         onChange={(e) => setAiConfig(aiConfig ? { ...aiConfig, baseUrl: e.target.value } : {
                           id: '',
@@ -1069,7 +1069,7 @@ export default function AdminPage() {
                       <Label htmlFor="ai_model">模型名称</Label>
                       <Input
                         id="ai_model"
-                        placeholder="gpt-3.5-turbo"
+                        placeholder="openai/gpt-oss-120b"
                         value={aiConfig?.model || ''}
                         onChange={(e) => setAiConfig(aiConfig ? { ...aiConfig, model: e.target.value } : {
                           id: '',

@@ -43,7 +43,18 @@ export class AIDetectionService {
     try {
       const userPrompt = `你是一个反垃圾评论系统助手。请分析下面的评论内容，评估其为垃圾评论的风险度。评论内容: ${content} 作者: ${author} 邮箱: ${email || '未提供'} 网站: ${website || '未提供'} 评估标准：1. 广告或推广内容2. 无意义或重复内容3. 包含恶意链接4. 包含不当或攻击性言论5. 明显的机器生成内容6. 但不要对无网址的评论太严格，以避免屏蔽了正常用户的评论。 请只返回一个 0-1 之间的数字，表示垃圾评论的风险度：- 0.0-0.3：正常评论，风险很低 - 0.3-0.7：可能有问题，需要进一步检查 - 0.7-1.0：很可能是垃圾评论 只返回数字，不要包含任何其他文本或解释。`
 
-      const response = await fetch(`${this.config.baseUrl}/v1/chat/completions`, {
+      // 确保 baseUrl 不以 / 结尾，避免双斜杠
+      const baseUrl = this.config.baseUrl.endsWith('/') ? this.config.baseUrl.slice(0, -1) : this.config.baseUrl
+      
+      // 构建正确的 API 端点 URL
+      let apiUrl = `${baseUrl}/v1/chat/completions`
+      
+      // 如果 baseUrl 已经包含了 /v1，则不再添加
+      if (baseUrl.includes('/v1')) {
+        apiUrl = `${baseUrl}/chat/completions`
+      }
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
