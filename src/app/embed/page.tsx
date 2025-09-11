@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 import { CommentForm } from '@/components/comment-form'
 import { CommentList } from '@/components/comment-list'
 import { MessageSquare } from 'lucide-react'
@@ -159,6 +161,14 @@ function EmbedContent() {
                 pageId={pageId}
                 onCommentAdded={handleCommentAdded}
             />
+
+            <div className="flex justify-center gap-4">
+                <Button variant="link" asChild className="text-xs font-normal text-muted-foreground">
+                    <Link href="https://github.com/uvexz/ascs" target='_blank'>
+                        A SIMPLE COMMENT SYSTEM
+                    </Link>
+                </Button>
+            </div>
         </div>
     )
 }
