@@ -172,15 +172,27 @@ export default function AdminPage() {
       setConfigError('')
       setConfigSuccess('')
 
+      if (!aiConfig || !aiConfig.baseUrl || !aiConfig.model || !aiConfig.apiKey) {
+        setConfigError('请填写所有必填字段')
+        return
+      }
+
       const response = await fetch('/api/admin/ai-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(aiConfig),
+        body: JSON.stringify({
+          baseUrl: aiConfig.baseUrl,
+          model: aiConfig.model,
+          apiKey: aiConfig.apiKey,
+          isEnabled: aiConfig.isEnabled,
+        }),
       })
 
       if (response.ok) {
+        const savedConfig = await response.json()
+        setAiConfig(savedConfig)
         setConfigSuccess('AI 配置保存成功！')
         setTimeout(() => setConfigSuccess(''), 3000)
       } else {
@@ -922,55 +934,81 @@ export default function AdminPage() {
                     <h3 className="text-lg font-semibold">AI 反垃圾评论配置</h3>
                   </div>
                   
-                  {aiConfig ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="ai_enabled"
-                          checked={aiConfig.isEnabled}
-                          onChange={(e) => setAiConfig({ ...aiConfig, isEnabled: e.target.checked })}
-                          className="rounded"
-                        />
-                        <Label htmlFor="ai_enabled">启用 AI 反垃圾评论功能</Label>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="ai_base_url">API 基础 URL</Label>
-                        <Input
-                          id="ai_base_url"
-                          placeholder="https://api.openai.com/v1"
-                          value={aiConfig.baseUrl}
-                          onChange={(e) => setAiConfig({ ...aiConfig, baseUrl: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="ai_model">模型名称</Label>
-                        <Input
-                          id="ai_model"
-                          placeholder="gpt-3.5-turbo"
-                          value={aiConfig.model}
-                          onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="ai_api_key">API 密钥</Label>
-                        <Input
-                          id="ai_api_key"
-                          type="password"
-                          placeholder="sk-..."
-                          value={aiConfig.apiKey}
-                          onChange={(e) => setAiConfig({ ...aiConfig, apiKey: e.target.value })}
-                        />
-                      </div>
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="ai_enabled"
+                        checked={aiConfig?.isEnabled ?? false}
+                        onChange={(e) => setAiConfig(aiConfig ? { ...aiConfig, isEnabled: e.target.checked } : {
+                          id: '',
+                          baseUrl: '',
+                          model: '',
+                          apiKey: '',
+                          isEnabled: e.target.checked,
+                          createdAt: '',
+                          updatedAt: ''
+                        })}
+                        className="rounded"
+                      />
+                      <Label htmlFor="ai_enabled">启用 AI 反垃圾评论功能</Label>
                     </div>
-                  ) : (
-                    <div className="text-center py-4 text-muted-foreground">
-                      暂无 AI 配置，请先创建配置
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ai_base_url">API 基础 URL</Label>
+                      <Input
+                        id="ai_base_url"
+                        placeholder="https://api.openai.com/v1"
+                        value={aiConfig?.baseUrl || ''}
+                        onChange={(e) => setAiConfig(aiConfig ? { ...aiConfig, baseUrl: e.target.value } : {
+                          id: '',
+                          baseUrl: e.target.value,
+                          model: '',
+                          apiKey: '',
+                          isEnabled: false,
+                          createdAt: '',
+                          updatedAt: ''
+                        })}
+                      />
                     </div>
-                  )}
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ai_model">模型名称</Label>
+                      <Input
+                        id="ai_model"
+                        placeholder="gpt-3.5-turbo"
+                        value={aiConfig?.model || ''}
+                        onChange={(e) => setAiConfig(aiConfig ? { ...aiConfig, model: e.target.value } : {
+                          id: '',
+                          baseUrl: '',
+                          model: e.target.value,
+                          apiKey: '',
+                          isEnabled: false,
+                          createdAt: '',
+                          updatedAt: ''
+                        })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="ai_api_key">API 密钥</Label>
+                      <Input
+                        id="ai_api_key"
+                        type="password"
+                        placeholder="sk-..."
+                        value={aiConfig?.apiKey || ''}
+                        onChange={(e) => setAiConfig(aiConfig ? { ...aiConfig, apiKey: e.target.value } : {
+                          id: '',
+                          baseUrl: '',
+                          model: '',
+                          apiKey: e.target.value,
+                          isEnabled: false,
+                          createdAt: '',
+                          updatedAt: ''
+                        })}
+                      />
+                    </div>
+                  </div>
 
                   <div className="text-sm text-muted-foreground">
                     <p>AI 反垃圾评论功能说明：</p>
@@ -990,11 +1028,9 @@ export default function AdminPage() {
                   <Button onClick={handleConfigSave} disabled={configLoading}>
                     {configLoading ? '保存中...' : '保存配置'}
                   </Button>
-                  {aiConfig && (
-                    <Button onClick={handleAIConfigSave} disabled={aiConfigLoading}>
-                      {aiConfigLoading ? '保存 AI 配置中...' : '保存 AI 配置'}
-                    </Button>
-                  )}
+                  <Button onClick={handleAIConfigSave} disabled={aiConfigLoading}>
+                    {aiConfigLoading ? '保存 AI 配置中...' : (aiConfig ? '保存 AI 配置' : '创建 AI 配置')}
+                  </Button>
                 </div>
               </CardContent>
             </Card>
