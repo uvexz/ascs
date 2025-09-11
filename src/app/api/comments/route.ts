@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
       if (isSpam) {
         // 确认垃圾评论，直接拒绝
         return createCorsResponse(
-          { error: 'Comment rejected as spam' },
+          { error: '你的留言被 AI 识别为垃圾评论，请检查后再提交。Your comment was identified as spam by AI, please check before submitting.' },
           { status: 400 }
         )
       }
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
 
         return createCorsResponse({
           ...comment,
-          message: '您的评论需要管理员审核'
+          message: '您的评论需要管理员审核。Your comment requires administrator review.'
         }, { status: 201 })
       }
     }
