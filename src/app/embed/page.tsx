@@ -95,7 +95,7 @@ function EmbedContent() {
 
     if (!siteId || !pageId) {
         return (
-            <div ref={containerRef} className="p-4">
+            <div ref={containerRef}>
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center text-red-500">
@@ -109,7 +109,7 @@ function EmbedContent() {
 
     if (loading) {
         return (
-            <div ref={containerRef} className="p-4">
+            <div ref={containerRef}>
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center text-muted-foreground">
@@ -123,7 +123,7 @@ function EmbedContent() {
 
     if (error) {
         return (
-            <div ref={containerRef} className="p-4">
+            <div ref={containerRef}>
                 <Card>
                     <CardContent className="p-6">
                         <div className="text-center text-red-500">
@@ -166,7 +166,7 @@ function EmbedContent() {
 export default function EmbedPage() {
     return (
         <Suspense fallback={
-            <div className="p-4 text-center">
+            <div className="text-center">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
                 <p className="text-gray-600">加载中...</p>
             </div>

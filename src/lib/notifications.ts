@@ -312,8 +312,11 @@ export async function notifyPendingComment(
     name?: string
   }
 ) {
-  // 生成审核和删除链接（使用一次性代码）
-  const { approveUrl, deleteUrl } = await generateModerationLinks(comment.id)
+  // 生成审核链接（使用一次性代码）
+  const { approveUrl } = await generateModerationLinks(comment.id)
+  
+  // 创建统一审核链接
+  const moderationUrl = approveUrl.replace('/approve', '')
   
   // 发送管理员待审核通知
   const adminMessage = `
@@ -324,9 +327,7 @@ export async function notifyPendingComment(
 作者: ${comment.author}
 内容: ${comment.content.substring(0, 100)}${comment.content.length > 100 ? '...' : ''}
 
-操作链接:
-✅ 通过审核: ${approveUrl}
-❌ 删除评论: ${deleteUrl}
+审核链接: ${moderationUrl}
 
 请点击链接审核此评论。链接24小时内有效，使用后即失效。
   `.trim()
