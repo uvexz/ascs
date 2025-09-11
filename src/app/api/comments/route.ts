@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
           email: comment.email || undefined,
           pageId: comment.pageId,
           siteId: comment.siteId,
+          parentId: comment.parentId || undefined,
         },
         {
           hostname: site.hostname,

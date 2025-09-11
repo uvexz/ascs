@@ -159,6 +159,7 @@ export async function notifyNewComment(
     email?: string
     pageId: string
     siteId: string
+    parentId?: string
   },
   site: {
     hostname: string
@@ -176,6 +177,14 @@ export async function notifyNewComment(
   `.trim()
 
   await sendTelegramNotification(adminMessage)
+
+  // 如果是回复，发送回复通知
+  if (comment.parentId) {
+    await notifyCommentReply({
+      ...comment,
+      parentId: comment.parentId // 确保 parentId 是 string
+    }, site)
+  }
 
   // 发送邮件订阅通知
   if (comment.email) {
@@ -221,6 +230,70 @@ export async function notifyNewComment(
 
     // 为新评论者创建订阅
     await subscribeToNotifications(comment.email, comment.siteId, comment.pageId)
+  }
+}
+
+export async function notifyCommentReply(
+  reply: {
+    id: string
+    content: string
+    author: string
+    email?: string
+    pageId: string
+    siteId: string
+    parentId: string
+  },
+  site: {
+    hostname: string
+    name?: string
+  }
+) {
+  try {
+    // 查找父评论
+    const parentComment = await prisma.comment.findUnique({
+      where: { id: reply.parentId },
+    })
+
+    if (!parentComment || !parentComment.email || parentComment.email === reply.email) {
+      // 如果没有找到父评论、父评论没有邮箱、或者是自己回复自己，则不发送通知
+      return
+    }
+
+    // 发送回复通知邮件
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2>您的评论收到了回复</h2>
+        <p>您在 <strong>${site.name || site.hostname}</strong> 的页面 <strong>${reply.pageId}</strong> 的评论收到了回复：</p>
+        
+        <div style="background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
+          <p style="font-size: 12px; color: #666; margin-bottom: 8px;">您的原评论：</p>
+          <p><strong>${parentComment.author}</strong> 说：</p>
+          <p>${parentComment.content}</p>
+        </div>
+        
+        <div style="background: #e8f4fd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #2563eb;">
+          <p style="font-size: 12px; color: #666; margin-bottom: 8px;"><strong>${reply.author}</strong> 回复说：</p>
+          <p>${reply.content}</p>
+        </div>
+        
+        <p><a href="${process.env.NEXTAUTH_URL}/?siteId=${reply.siteId}&pageId=${encodeURIComponent(reply.pageId)}" style="color: #2563eb;">查看完整讨论</a></p>
+        
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+        <p style="font-size: 12px; color: #666;">
+          此邮件是回复通知，如果您不想再收到此类通知，请联系网站管理员。
+        </p>
+      </div>
+    `
+
+    await sendEmailNotification(
+      parentComment.email,
+      `您的评论收到了回复 - ${site.name || site.hostname}`,
+      emailHtml
+    )
+
+    console.log(`Reply notification sent to ${parentComment.email} for comment ${reply.id}`)
+  } catch (error) {
+    console.error('Failed to send reply notification:', error)
   }
 }
 
