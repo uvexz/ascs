@@ -177,7 +177,7 @@ export function CommentForm({
             <TabsContent value="preview" className="mt-2">
               <div className="min-h-[150px] p-4 border rounded-md bg-muted/50">
                 {content ? (
-                  <div className="prose prose-sm max-w-none dark:prose-invert">
+                  <div className="prose prose-sm prose-a:text-sky-600 prose-a:no-underline hover:prose-a:text-sky-500 prose-ul:list-outside prose-table:border prose-th:border prose-th:p-2 prose-td:border prose-td:p-2 prose-img:rounded-xl prose-img:border prose-h1:text-slate-600 prose-h2:text-slate-600 prose-h3:text-slate-600 prose-h4:text-slate-600 prose-h5:text-slate-600 prose-blockquote:text-slate-500 max-w-none dark:prose-invert">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeHighlight]}
