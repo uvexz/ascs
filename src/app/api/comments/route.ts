@@ -4,6 +4,7 @@ import { notifyNewComment } from '@/lib/notifications'
 import { aiDetectionService } from '@/lib/ai-detection'
 import { notifyPendingComment } from '@/lib/notifications'
 import { createCorsResponse, handleOptions } from '@/lib/cors'
+import { commentRateLimiter } from '@/lib/rate-limit'
 
 export async function OPTIONS() {
   return handleOptions()
@@ -59,8 +60,47 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * 获取客户端 IP 地址
+ */
+function getClientIP(request: NextRequest): string {
+  // 尝试从各种头部获取 IP 地址
+  const forwarded = request.headers.get('x-forwarded-for')
+  const realIP = request.headers.get('x-real-ip')
+  const cfConnectingIP = request.headers.get('cf-connecting-ip')
+  
+  // 如果有 cf-connecting-ip（Cloudflare），优先使用
+  if (cfConnectingIP) {
+    return cfConnectingIP
+  }
+  
+  // 如果有 x-real-ip，使用它
+  if (realIP) {
+    return realIP
+  }
+  
+  // 如果有 x-forwarded-for，使用第一个 IP（可能是客户端真实IP）
+  if (forwarded) {
+    return forwarded.split(',')[0].trim()
+  }
+  
+  // 最后使用直接连接的 IP
+  return 'unknown'
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // 获取客户端 IP 地址
+    const ip = getClientIP(request)
+    
+    // 检查速率限制
+    if (commentRateLimiter.isRateLimited(ip)) {
+      return createCorsResponse(
+        { error: 'Too many requests. Please wait 1 second before submitting another comment.' },
+        { status: 429 }
+      )
+    }
+
     const body = await request.json()
     const { siteId, pageId, author, content, email, website, parentId } = body
 

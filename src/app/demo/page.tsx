@@ -132,14 +132,7 @@ export default function DemoPage() {
                     </Card>
 
                     {/* 实际评论区域 */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <MessageSquare className="h-5 w-5" />
-                                评论区域
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
+
                             {loading ? (
                                 <div className="text-center py-8">
                                     <p className="text-muted-foreground">加载评论系统中...</p>
@@ -151,8 +144,6 @@ export default function DemoPage() {
                             ) : (
                                 <CommentBox siteId={siteId} pageId="/demo/welcome" />
                             )}
-                        </CardContent>
-                    </Card>
 
                     {/* 功能说明 */}
                     <div className="mt-8 text-center">

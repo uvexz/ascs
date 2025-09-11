@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { MessageSquare } from 'lucide-react'
 import { CommentForm } from './comment-form'
 import { generateAvatarUrl } from '@/lib/avatar'
@@ -50,6 +51,39 @@ export function CommentItem({
     })
   }
 
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+    
+    if (diffInSeconds < 60) {
+      return '几秒钟前'
+    }
+    
+    const diffInMinutes = Math.floor(diffInSeconds / 60)
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}分钟前`
+    }
+    
+    const diffInHours = Math.floor(diffInMinutes / 60)
+    if (diffInHours < 24) {
+      return `${diffInHours}小时前`
+    }
+    
+    const diffInDays = Math.floor(diffInHours / 24)
+    if (diffInDays < 30) {
+      return `${diffInDays}天前`
+    }
+    
+    const diffInMonths = Math.floor(diffInDays / 30)
+    if (diffInMonths < 12) {
+      return `${diffInMonths}月前`
+    }
+    
+    const diffInYears = Math.floor(diffInMonths / 12)
+    return `${diffInYears}年前`
+  }
+
   const getInitials = (name: string) => {
     return name.charAt(0).toUpperCase()
   }
@@ -88,8 +122,9 @@ export function CommentItem({
                 {comment.author}
               </span>
             )}
-            <span>•</span>
-            <time>{formatDate(comment.createdAt)}</time>
+            <Badge variant="outline" className="text-xs text-muted-foreground font-medium">
+              <time>{getRelativeTime(comment.createdAt)}</time>
+            </Badge>
             {comment.status === 'PENDING' && (
               <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
                 待审核
