@@ -46,6 +46,7 @@ model Comment {
   email     String?
   website   String?
   pageId    String   // 页面标识符，如 "/posts/hello-world"
+  status    CommentStatus @default(APPROVED) // 评论状态：APPROVED（正常）, PENDING（待审核）, REJECTED（垃圾评论）
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
@@ -61,12 +62,30 @@ model Comment {
   @@map("comments")
 }
 
+enum CommentStatus {
+  APPROVED  // 正常评论，直接放行
+  PENDING   // 疑似垃圾评论，待审核
+  REJECTED  // 确认垃圾评论，拒绝
+}
+
 model SystemConfig {
   id    String @id @default(cuid())
   key   String @unique
   value String
   
   @@map("system_configs")
+}
+
+model AIConfig {
+  id        String   @id @default(cuid())
+  baseUrl   String   // OpenAI 兼容 API 的基础 URL
+  model     String   // 使用的模型名称
+  apiKey    String   // API 密钥
+  isEnabled Boolean  @default(true) // 是否启用 AI 检测
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("ai_configs")
 }
 
 model Subscription {

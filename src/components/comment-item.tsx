@@ -18,6 +18,7 @@ interface Comment {
   email?: string
   website?: string
   createdAt: string
+  status?: 'APPROVED' | 'PENDING' | 'REJECTED'
   replies?: Comment[]
 }
 
@@ -74,9 +75,9 @@ export function CommentItem({
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {comment.website ? (
-              <a 
-                href={comment.website} 
-                target="_blank" 
+              <a
+                href={comment.website}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-foreground hover:underline"
               >
@@ -89,6 +90,11 @@ export function CommentItem({
             )}
             <span>•</span>
             <time>{formatDate(comment.createdAt)}</time>
+            {comment.status === 'PENDING' && (
+              <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                待审核
+              </span>
+            )}
           </div>
           
           <div className="text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert">

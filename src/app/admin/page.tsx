@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Trash2, Globe, MessageSquare, Settings, LogOut, Mail, Send, Edit, Code, Copy, Check } from 'lucide-react'
+import { Trash2, Globe, MessageSquare, Settings, LogOut, Mail, Send, Edit, Code, Copy, Check, Bot } from 'lucide-react'
 import { Navigation } from '@/components/navigation'
 
 interface Site {
@@ -34,10 +34,21 @@ interface Comment {
   }
 }
 
+interface AIConfig {
+  id: string
+  baseUrl: string
+  model: string
+  apiKey: string
+  isEnabled: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export default function AdminPage() {
   const [user, setUser] = useState<{ username: string } | null>(null)
   const [sites, setSites] = useState<Site[]>([])
   const [comments, setComments] = useState<Comment[]>([])
+  const [aiConfig, setAiConfig] = useState<AIConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [showAddSite, setShowAddSite] = useState(false)
   const [showConfig, setShowConfig] = useState(false)
@@ -45,6 +56,7 @@ export default function AdminPage() {
   const [configLoading, setConfigLoading] = useState(false)
   const [configError, setConfigError] = useState('')
   const [configSuccess, setConfigSuccess] = useState('')
+  const [aiConfigLoading, setAiConfigLoading] = useState(false)
   const [editingSite, setEditingSite] = useState<Site | null>(null)
   const [showEmbedDetails, setShowEmbedDetails] = useState<Site | null>(null)
   const [copiedCode, setCopiedCode] = useState('')
@@ -139,6 +151,49 @@ export default function AdminPage() {
     }
   }
 
+  const fetchAIConfig = async () => {
+    try {
+      setAiConfigLoading(true)
+      const response = await fetch('/api/admin/ai-config')
+      if (response.ok) {
+        const data = await response.json()
+        setAiConfig(data)
+      }
+    } catch (error) {
+      console.error('Error fetching AI config:', error)
+    } finally {
+      setAiConfigLoading(false)
+    }
+  }
+
+  const handleAIConfigSave = async () => {
+    try {
+      setAiConfigLoading(true)
+      setConfigError('')
+      setConfigSuccess('')
+
+      const response = await fetch('/api/admin/ai-config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(aiConfig),
+      })
+
+      if (response.ok) {
+        setConfigSuccess('AI 配置保存成功！')
+        setTimeout(() => setConfigSuccess(''), 3000)
+      } else {
+        const data = await response.json()
+        setConfigError(data.error || '保存失败')
+      }
+    } catch (error) {
+      setConfigError('保存失败，请重试')
+    } finally {
+      setAiConfigLoading(false)
+    }
+  }
+
   const handleConfigSave = async () => {
     try {
       setConfigLoading(true)
@@ -170,6 +225,7 @@ export default function AdminPage() {
   const handleShowConfig = () => {
     setShowConfig(true)
     fetchConfig()
+    fetchAIConfig()
   }
 
   const handleAddSite = async (e: React.FormEvent) => {
@@ -857,6 +913,76 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                <Separator />
+
+                {/* AI 配置 */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-4 w-4" />
+                    <h3 className="text-lg font-semibold">AI 反垃圾评论配置</h3>
+                  </div>
+                  
+                  {aiConfig ? (
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id="ai_enabled"
+                          checked={aiConfig.isEnabled}
+                          onChange={(e) => setAiConfig({ ...aiConfig, isEnabled: e.target.checked })}
+                          className="rounded"
+                        />
+                        <Label htmlFor="ai_enabled">启用 AI 反垃圾评论功能</Label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai_base_url">API 基础 URL</Label>
+                        <Input
+                          id="ai_base_url"
+                          placeholder="https://api.openai.com/v1"
+                          value={aiConfig.baseUrl}
+                          onChange={(e) => setAiConfig({ ...aiConfig, baseUrl: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai_model">模型名称</Label>
+                        <Input
+                          id="ai_model"
+                          placeholder="gpt-3.5-turbo"
+                          value={aiConfig.model}
+                          onChange={(e) => setAiConfig({ ...aiConfig, model: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="ai_api_key">API 密钥</Label>
+                        <Input
+                          id="ai_api_key"
+                          type="password"
+                          placeholder="sk-..."
+                          value={aiConfig.apiKey}
+                          onChange={(e) => setAiConfig({ ...aiConfig, apiKey: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4 text-muted-foreground">
+                      暂无 AI 配置，请先创建配置
+                    </div>
+                  )}
+
+                  <div className="text-sm text-muted-foreground">
+                    <p>AI 反垃圾评论功能说明：</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>支持 OpenAI 兼容的 API 接口</li>
+                      <li>确认为垃圾信息的评论将被直接删除</li>
+                      <li>疑似垃圾信息的评论将标记为待审核，并发送通知给管理员</li>
+                      <li>正常评论将直接放行</li>
+                    </ul>
+                  </div>
+                </div>
+
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => setShowConfig(false)}>
                     取消
@@ -864,6 +990,11 @@ export default function AdminPage() {
                   <Button onClick={handleConfigSave} disabled={configLoading}>
                     {configLoading ? '保存中...' : '保存配置'}
                   </Button>
+                  {aiConfig && (
+                    <Button onClick={handleAIConfigSave} disabled={aiConfigLoading}>
+                      {aiConfigLoading ? '保存 AI 配置中...' : '保存 AI 配置'}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

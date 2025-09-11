@@ -10,6 +10,7 @@ interface Comment {
   email?: string
   website?: string
   createdAt: string
+  status?: 'APPROVED' | 'PENDING' | 'REJECTED'
   replies?: Comment[]
 }
 
@@ -21,7 +22,10 @@ interface CommentListProps {
 }
 
 export function CommentList({ comments, siteId, pageId, onCommentAdded }: CommentListProps) {
-  if (comments.length === 0) {
+  // 只显示已批准的评论
+  const approvedComments = comments.filter(comment => comment.status === 'APPROVED' || comment.status === undefined)
+  
+  if (approvedComments.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         还没有评论，来发表第一条评论吧！
@@ -31,7 +35,7 @@ export function CommentList({ comments, siteId, pageId, onCommentAdded }: Commen
 
   return (
     <div className="space-y-6">
-      {comments.map((comment, index) => (
+      {approvedComments.map((comment, index) => (
         <div key={comment.id}>
           <CommentItem
             comment={comment}
@@ -39,7 +43,7 @@ export function CommentList({ comments, siteId, pageId, onCommentAdded }: Commen
             pageId={pageId}
             onCommentAdded={onCommentAdded}
           />
-          {index < comments.length - 1 && <Separator className="mt-6" />}
+          {index < approvedComments.length - 1 && <Separator className="mt-6" />}
         </div>
       ))}
     </div>

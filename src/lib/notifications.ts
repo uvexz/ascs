@@ -50,7 +50,7 @@ export async function sendEmailNotification(
       return false
     }
 
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: config.smtpHost,
       port: config.smtpPort || 587,
       secure: config.smtpPort === 465,
@@ -222,4 +222,36 @@ export async function notifyNewComment(
     // 为新评论者创建订阅
     await subscribeToNotifications(comment.email, comment.siteId, comment.pageId)
   }
+}
+
+export async function notifyPendingComment(
+  comment: {
+    id: string
+    content: string
+    author: string
+    email?: string
+    pageId: string
+    siteId: string
+  },
+  site: {
+    hostname: string
+    name?: string
+  }
+) {
+  // 发送管理员待审核通知
+  const adminMessage = `
+⚠️ 评论待审核通知
+
+站点: ${site.name || site.hostname}
+页面: ${comment.pageId}
+作者: ${comment.author}
+内容: ${comment.content.substring(0, 100)}${comment.content.length > 100 ? '...' : ''}
+
+请访问管理后台审核此评论。
+  `.trim()
+
+  await sendTelegramNotification(adminMessage)
+
+  // 也可以发送邮件通知管理员（如果配置了管理员邮箱）
+  // 这里可以根据需要添加管理员邮箱配置
 }
