@@ -85,7 +85,7 @@ export function CommentItem({
   }
 
   return (
-    <div className={`${level > 0 ? 'ml-6 mt-4 pl-4 border-l-2 border-muted' : ''}`}>
+    <div className={`${level > 0 ? 'mt-4 pl-4 border-l-2 border-muted' : ''}`}>
       <div className="flex gap-3">
         <Avatar className="h-8 w-8">
           <AvatarImage 
