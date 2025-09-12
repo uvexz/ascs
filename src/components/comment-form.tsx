@@ -1,32 +1,32 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import Cookies from 'js-cookie'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeHighlight from 'rehype-highlight'
-import 'highlight.js/styles/github.css'
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import Cookies from "js-cookie";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import "highlight.js/styles/github.css";
 
 // 声明全局 Cap 类型
 declare global {
   interface Window {
-    Cap: any
+    Cap: any;
   }
 }
 
 interface CommentFormProps {
-  siteId: string
-  pageId: string
-  parentId?: string
-  onCommentAdded: () => void
-  onCancel?: () => void
+  siteId: string;
+  pageId: string;
+  parentId?: string;
+  onCommentAdded: () => void;
+  onCancel?: () => void;
 }
 
 export function CommentForm({
@@ -34,164 +34,170 @@ export function CommentForm({
   pageId,
   parentId,
   onCommentAdded,
-  onCancel
+  onCancel,
 }: CommentFormProps) {
-  const [author, setAuthor] = useState('')
-  const [email, setEmail] = useState('')
-  const [website, setWebsite] = useState('')
-  const [content, setContent] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit')
-  const [submitMessage, setSubmitMessage] = useState<string | null>(null)
-  const [submitMessageType, setSubmitMessageType] = useState<'success' | 'error' | 'warning'>('success')
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const [captchaSolutions, setCaptchaSolutions] = useState<any>(null)
-  const [captchaLoaded, setCaptchaLoaded] = useState(false)
+  const [author, setAuthor] = useState("");
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
+  const [content, setContent] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mode, setMode] = useState<"edit" | "preview">("edit");
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [submitMessageType, setSubmitMessageType] = useState<
+    "success" | "error" | "warning"
+  >("success");
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaSolutions, setCaptchaSolutions] = useState<any>(null);
+  const [captchaLoaded, setCaptchaLoaded] = useState(false);
 
   // 从 cookies 加载用户信息
   useEffect(() => {
-    const savedAuthor = Cookies.get('ascs-author')
-    const savedEmail = Cookies.get('ascs-email')
-    const savedWebsite = Cookies.get('ascs-website')
+    const savedAuthor = Cookies.get("ascs-author");
+    const savedEmail = Cookies.get("ascs-email");
+    const savedWebsite = Cookies.get("ascs-website");
 
-    if (savedAuthor) setAuthor(savedAuthor)
-    if (savedEmail) setEmail(savedEmail)
-    if (savedWebsite) setWebsite(savedWebsite)
-  }, [])
+    if (savedAuthor) setAuthor(savedAuthor);
+    if (savedEmail) setEmail(savedEmail);
+    if (savedWebsite) setWebsite(savedWebsite);
+  }, []);
 
   // 加载 Cap.js 脚本
   useEffect(() => {
     const loadCapScript = () => {
       if (window.Cap) {
-        setCaptchaLoaded(true)
-        return
+        setCaptchaLoaded(true);
+        return;
       }
 
       // 设置 WASM URL（如果需要）
-      ;(window as any).CAP_CUSTOM_WASM_URL = 'https://use.sevencdn.com/npm/@cap.js/wasm/browser/cap_wasm.min.js'
+      (window as any).CAP_CUSTOM_WASM_URL =
+        "https://use.sevencdn.com/npm/@cap.js/wasm/browser/cap_wasm.min.js";
 
-      const script = document.createElement('script')
-      script.src = 'https://use.sevencdn.com/npm/@cap.js/widget'
+      const script = document.createElement("script");
+      script.src = "https://use.sevencdn.com/npm/@cap.js/widget";
       script.onload = () => {
-        console.log('Cap.js script loaded successfully')
-        setCaptchaLoaded(true)
-      }
+        console.log("Cap.js script loaded successfully");
+        setCaptchaLoaded(true);
+      };
       script.onerror = () => {
-        console.error('Failed to load Cap.js script')
-        setSubmitMessage('无法加载验证组件')
-        setSubmitMessageType('error')
-      }
-      document.head.appendChild(script)
-    }
+        console.error("Failed to load Cap.js script");
+        setSubmitMessage("无法加载验证组件");
+        setSubmitMessageType("error");
+      };
+      document.head.appendChild(script);
+    };
 
-    loadCapScript()
-  }, [])
+    loadCapScript();
+  }, []);
 
   // 初始化 CAPTCHA
-  const [capInstance, setCapInstance] = useState<any>(null)
-  const [isCapSolving, setIsCapSolving] = useState(false)
+  const [capInstance, setCapInstance] = useState<any>(null);
+  const [isCapSolving, setIsCapSolving] = useState(false);
 
   useEffect(() => {
     if (captchaLoaded && !capInstance) {
       try {
         // 使用 invisible mode
         const cap = new (window as any).Cap({
-          apiEndpoint: '/api/'
-        })
+          apiEndpoint: "/api/",
+        });
 
-        cap.addEventListener('progress', (e: any) => {
-          console.log('CAPTCHA progress:', e.detail.progress + '%')
-        })
+        cap.addEventListener("progress", (e: any) => {
+          console.log("CAPTCHA progress:", e.detail.progress + "%");
+        });
 
-        cap.addEventListener('error', (e: any) => {
-          console.error('CAPTCHA error:', e.detail)
-          setSubmitMessage(`CAPTCHA 错误: ${e.detail.message || 'Unknown error'}`)
-          setSubmitMessageType('error')
-          setIsCapSolving(false)
-        })
+        cap.addEventListener("error", (e: any) => {
+          console.error("CAPTCHA error:", e.detail);
+          setSubmitMessage(
+            `CAPTCHA 错误: ${e.detail.message || "Unknown error"}`,
+          );
+          setSubmitMessageType("error");
+          setIsCapSolving(false);
+        });
 
-        setCapInstance(cap)
+        setCapInstance(cap);
       } catch (error) {
-        console.error('Failed to create Cap instance:', error)
-        setSubmitMessage('无法初始化验证组件')
-        setSubmitMessageType('error')
+        console.error("Failed to create Cap instance:", error);
+        setSubmitMessage("无法初始化验证组件");
+        setSubmitMessageType("error");
       }
     }
-  }, [captchaLoaded, capInstance])
+  }, [captchaLoaded, capInstance]);
 
   // 手动触发 CAPTCHA 解决
   const solveCaptcha = async () => {
-    if (!capInstance || isCapSolving) return
+    if (!capInstance || isCapSolving) return;
 
-    setIsCapSolving(true)
-    setSubmitMessage('正在进行安全验证...')
-    setSubmitMessageType('success')
+    setIsCapSolving(true);
+    setSubmitMessage(
+      "正在进行安全验证...若长时间处于验证状态请刷新页面后重试！",
+    );
+    setSubmitMessageType("success");
 
     try {
-      const result = await capInstance.solve()
-      console.log('CAPTCHA solved:', result)
-      setCaptchaToken(result.token)
-      setCaptchaSolutions(result.solutions || [])
+      const result = await capInstance.solve();
+      console.log("CAPTCHA solved:", result);
+      setCaptchaToken(result.token);
+      setCaptchaSolutions(result.solutions || []);
 
       // 显示成功消息
-      setSubmitMessage('验证完成！')
-      setSubmitMessageType('success')
+      setSubmitMessage("验证完成！");
+      setSubmitMessageType("success");
 
       // 3秒后自动隐藏成功消息
       setTimeout(() => {
-        setSubmitMessage(null)
-      }, 3000)
-
+        setSubmitMessage(null);
+      }, 3000);
     } catch (error) {
-      console.error('CAPTCHA solve error:', error)
-      setSubmitMessage('验证失败，请重新点击进行认证！')
-      setSubmitMessageType('error')
+      console.error("CAPTCHA solve error:", error);
+      setSubmitMessage("验证失败，请重新点击进行认证！");
+      setSubmitMessageType("error");
     } finally {
-      setIsCapSolving(false)
+      setIsCapSolving(false);
     }
-  }
+  };
 
   // 重置 CAPTCHA
   const resetCaptcha = () => {
-    setCaptchaToken(null)
-    setCaptchaSolutions(null)
-  }
+    setCaptchaToken(null);
+    setCaptchaSolutions(null);
+  };
 
   // 保存用户信息到 cookies
   const saveUserInfo = () => {
     if (author.trim()) {
-      Cookies.set('ascs-author', author.trim(), { expires: 365 })
+      Cookies.set("ascs-author", author.trim(), { expires: 365 });
     }
     if (email.trim()) {
-      Cookies.set('ascs-email', email.trim(), { expires: 365 })
+      Cookies.set("ascs-email", email.trim(), { expires: 365 });
     }
     if (website.trim()) {
-      Cookies.set('ascs-website', website.trim(), { expires: 365 })
+      Cookies.set("ascs-website", website.trim(), { expires: 365 });
     }
-  }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
     if (!author.trim() || !content.trim()) {
-      setSubmitMessage('请填写姓名和评论内容')
-      setSubmitMessageType('error')
-      return
+      setSubmitMessage("请填写姓名和评论内容");
+      setSubmitMessageType("error");
+      return;
     }
 
     if (!captchaToken || !captchaSolutions) {
-      setSubmitMessage('请完成 CAPTCHA 验证')
-      setSubmitMessageType('error')
-      return
+      setSubmitMessage("请完成 CAPTCHA 验证");
+      setSubmitMessageType("error");
+      return;
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/comments', {
-        method: 'POST',
+      const response = await fetch("/api/comments", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           siteId,
@@ -204,47 +210,46 @@ export function CommentForm({
           captchaToken,
           captchaSolutions,
         }),
-      })
+      });
 
       if (response.ok) {
-        const result = await response.json()
-        saveUserInfo() // 保存用户信息到 cookies
-        setContent('') // 只清空评论内容，保留用户信息
+        const result = await response.json();
+        saveUserInfo(); // 保存用户信息到 cookies
+        setContent(""); // 只清空评论内容，保留用户信息
 
         // 根据返回的消息类型显示不同的提示
-        if (result.message && result.message.includes('需要管理员审核')) {
-          setSubmitMessage(result.message)
-          setSubmitMessageType('warning')
+        if (result.message && result.message.includes("需要管理员审核")) {
+          setSubmitMessage(result.message);
+          setSubmitMessageType("warning");
         } else {
-          onCommentAdded()
-          if (onCancel) onCancel()
+          onCommentAdded();
+          if (onCancel) onCancel();
         }
 
         // 重置 CAPTCHA
-        resetCaptcha()
+        resetCaptcha();
       } else {
-        const error = await response.json()
-        setSubmitMessage(error.error || '提交失败，请重试')
-        setSubmitMessageType('error')
+        const error = await response.json();
+        setSubmitMessage(error.error || "提交失败，请重试");
+        setSubmitMessageType("error");
       }
     } catch (error) {
-      console.error('Error submitting comment:', error)
-      setSubmitMessage('提交失败，请重试')
-      setSubmitMessageType('error')
+      console.error("Error submitting comment:", error);
+      setSubmitMessage("提交失败，请重试");
+      setSubmitMessageType("error");
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
-  }
+  };
 
   return (
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-lg">
-          {parentId ? '回复评论' : '发表评论'}
+          {parentId ? "回复评论" : "发表评论"}
         </CardTitle>
       </CardHeader>
       <CardContent>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
@@ -266,7 +271,10 @@ export function CommentForm({
               onChange={(e) => setWebsite(e.target.value)}
             />
           </div>
-          <Tabs value={mode} onValueChange={(value) => setMode(value as 'edit' | 'preview')}>
+          <Tabs
+            value={mode}
+            onValueChange={(value) => setMode(value as "edit" | "preview")}
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="edit">编辑</TabsTrigger>
               <TabsTrigger value="preview">预览</TabsTrigger>
@@ -282,11 +290,36 @@ export function CommentForm({
               />
               <div className="mt-2 text-xs text-muted-foreground">
                 支持 Markdown 格式：
-                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>**粗体**</Badge>
-                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>*斜体*</Badge>
-                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>`代码`</Badge>
-                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>[链接](url)</Badge>
-                <Badge variant="secondary" className='text-xs font-normal text-muted-foreground me-1'>&gt; 引用</Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs font-normal text-muted-foreground me-1"
+                >
+                  **粗体**
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs font-normal text-muted-foreground me-1"
+                >
+                  *斜体*
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs font-normal text-muted-foreground me-1"
+                >
+                  `代码`
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs font-normal text-muted-foreground me-1"
+                >
+                  [链接](url)
+                </Badge>
+                <Badge
+                  variant="secondary"
+                  className="text-xs font-normal text-muted-foreground me-1"
+                >
+                  &gt; 引用
+                </Badge>
               </div>
             </TabsContent>
             <TabsContent value="preview" className="mt-2">
@@ -299,11 +332,30 @@ export function CommentForm({
                       components={{
                         // 自定义组件渲染
                         p: ({ children }) => <p className="my-2">{children}</p>,
-                        h1: ({ children }) => <h1 className="text-lg font-semibold my-2">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-base font-semibold my-2">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-sm font-semibold my-2">{children}</h3>,
+                        h1: ({ children }) => (
+                          <h1 className="text-lg font-semibold my-2">
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-base font-semibold my-2">
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-sm font-semibold my-2">
+                            {children}
+                          </h3>
+                        ),
                         code: ({ children, ...props }: any) => {
-                          return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                          return (
+                            <code
+                              className="bg-muted px-1 py-0.5 rounded text-xs font-mono"
+                              {...props}
+                            >
+                              {children}
+                            </code>
+                          );
                         },
                         pre: ({ children }) => (
                           <pre className="bg-muted p-3 rounded-md overflow-x-auto my-2 text-xs">
@@ -315,9 +367,19 @@ export function CommentForm({
                             {children}
                           </blockquote>
                         ),
-                        ul: ({ children }) => <ul className="list-disc list-inside my-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside my-2 space-y-1">{children}</ol>,
-                        li: ({ children }) => <li className="text-sm">{children}</li>,
+                        ul: ({ children }) => (
+                          <ul className="list-disc list-inside my-2 space-y-1">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal list-inside my-2 space-y-1">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="text-sm">{children}</li>
+                        ),
                         a: ({ href, children }) => (
                           <a
                             href={href}
@@ -342,8 +404,6 @@ export function CommentForm({
             </TabsContent>
           </Tabs>
 
-
-
           {/* 按钮区域 */}
           <div className="flex gap-2">
             {!captchaLoaded ? (
@@ -355,13 +415,13 @@ export function CommentForm({
                 type="button"
                 onClick={solveCaptcha}
                 disabled={isCapSolving}
-                className="bg-orange-600 hover:bg-orange-700"
+                className="bg-green-600 hover:bg-green-600/90"
               >
-                {isCapSolving ? '验证中...' : '开始安全验证'}
+                {isCapSolving ? "验证中..." : "开始安全验证"}
               </Button>
             ) : (
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? '提交中...' : '提交评论'}
+                {isSubmitting ? "提交中..." : "提交评论"}
               </Button>
             )}
             {onCancel && (
@@ -372,13 +432,13 @@ export function CommentForm({
           </div>
         </form>
         {submitMessage && (
-          <Alert className={`mt-4 ${submitMessageType === 'error' ? 'border-red-200 bg-red-50' : submitMessageType === 'warning' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
-            <AlertDescription>
-              {submitMessage}
-            </AlertDescription>
+          <Alert
+            className={`mt-4 ${submitMessageType === "error" ? "border-red-200 bg-red-50" : submitMessageType === "warning" ? "border-yellow-200 bg-yellow-50" : "border-green-200 bg-green-50"}`}
+          >
+            <AlertDescription>{submitMessage}</AlertDescription>
           </Alert>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
