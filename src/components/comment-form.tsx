@@ -244,13 +244,7 @@ export function CommentForm({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {submitMessage && (
-          <Alert className={`mb-4 ${submitMessageType === 'error' ? 'border-red-200 bg-red-50' : submitMessageType === 'warning' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
-            <AlertDescription>
-              {submitMessage}
-            </AlertDescription>
-          </Alert>
-        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Input
@@ -361,6 +355,7 @@ export function CommentForm({
                 type="button"
                 onClick={solveCaptcha}
                 disabled={isCapSolving}
+                className="bg-orange-600 hover:bg-orange-700"
               >
                 {isCapSolving ? '验证中...' : '开始安全验证'}
               </Button>
@@ -376,6 +371,13 @@ export function CommentForm({
             )}
           </div>
         </form>
+        {submitMessage && (
+          <Alert className={`mt-4 ${submitMessageType === 'error' ? 'border-red-200 bg-red-50' : submitMessageType === 'warning' ? 'border-yellow-200 bg-yellow-50' : 'border-green-200 bg-green-50'}`}>
+            <AlertDescription>
+              {submitMessage}
+            </AlertDescription>
+          </Alert>
+        )}
       </CardContent>
     </Card>
   )
