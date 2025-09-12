@@ -68,7 +68,7 @@ export function CommentForm({
       }
 
       // 设置 WASM URL（如果需要）
-      // (window as any).CAP_CUSTOM_WASM_URL = 'https://cdn.jsdelivr.net/npm/@cap.js/widget/cap_wasm_bg.wasm'
+      ;(window as any).CAP_CUSTOM_WASM_URL = 'https://use.sevencdn.com/npm/@cap.js/wasm/browser/cap_wasm.min.js'
 
       const script = document.createElement('script')
       script.src = 'https://use.sevencdn.com/npm/@cap.js/widget'
@@ -134,7 +134,7 @@ export function CommentForm({
       setCaptchaSolutions(result.solutions || [])
 
       // 显示成功消息
-      setSubmitMessage('验证完成')
+      setSubmitMessage('验证完成！')
       setSubmitMessageType('success')
 
       // 3秒后自动隐藏成功消息
@@ -144,7 +144,7 @@ export function CommentForm({
 
     } catch (error) {
       console.error('CAPTCHA solve error:', error)
-      setSubmitMessage('验证失败，请重试')
+      setSubmitMessage('验证失败，请重新点击进行认证！')
       setSubmitMessageType('error')
     } finally {
       setIsCapSolving(false)
