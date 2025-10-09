@@ -85,7 +85,7 @@ export function CommentItem({
   }
 
   return (
-    <div className={`${level > 0 ? 'mt-4 pl-4 border-l-2 border-muted' : ''}`}>
+    <div className={`${level > 0 ? 'mt-4 pl-4 border-l-2 border-gray-200' : ''}`}>
       <div className="flex gap-3">
         <Avatar className="h-8 w-8">
           <AvatarImage 
@@ -98,22 +98,22 @@ export function CommentItem({
         </Avatar>
         
         <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
             {comment.website ? (
               <a
                 href={comment.website}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-medium text-foreground hover:underline"
+                className="font-medium text-gray-900 hover:underline"
               >
                 {comment.author}
               </a>
             ) : (
-              <span className="font-medium text-foreground">
+              <span className="font-medium text-gray-900">
                 {comment.author}
               </span>
             )}
-            <Badge variant="outline" className="text-xs text-muted-foreground font-medium">
+            <Badge variant="outline" className="text-xs text-gray-500 font-medium">
               <time>{getRelativeTime(comment.createdAt)}</time>
             </Badge>
             {comment.status === 'PENDING' && (
@@ -135,17 +135,17 @@ export function CommentItem({
                 h3: ({ children }) => <h3 className="text-sm font-semibold my-2">{children}</h3>,
                 code: ({ inline, children, ...props }) => {
                   if (inline) {
-                    return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
+                    return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
                   }
                   return <code {...props}>{children}</code>
                 },
                 pre: ({ children }) => (
-                  <pre className="bg-muted p-3 rounded-md overflow-x-auto my-2 text-xs">
+                  <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto my-2 text-xs">
                     {children}
                   </pre>
                 ),
                 blockquote: ({ children }) => (
-                  <blockquote className="border-l-4 border-border pl-4 my-2 text-muted-foreground italic">
+                  <blockquote className="border-l-4 border-gray-200 pl-4 my-2 text-gray-600 italic">
                     {children}
                   </blockquote>
                 ),
@@ -157,7 +157,7 @@ export function CommentItem({
                     href={href} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="text-primary hover:underline"
+                    className="text-blue-600 hover:underline"
                   >
                     {children}
                   </a>
@@ -173,7 +173,7 @@ export function CommentItem({
               variant="ghost"
               size="sm"
               onClick={() => setShowReplyForm(!showReplyForm)}
-              className="h-auto p-1 text-xs text-muted-foreground hover:text-foreground"
+              className="h-auto p-1 text-xs text-gray-500 hover:text-gray-900"
             >
               <MessageSquare className="h-3 w-3 mr-1" />
               回复

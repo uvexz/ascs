@@ -27,7 +27,7 @@ export function CommentList({ comments, siteId, pageId, onCommentAdded }: Commen
   
   if (approvedComments.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
+      <div className="text-center py-8 text-gray-500">
         还没有评论，来发表第一条评论吧！
       </div>
     )

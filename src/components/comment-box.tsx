@@ -65,7 +65,7 @@ export function CommentBox({ siteId, pageId }: CommentBoxProps) {
     return (
       <Card className="w-full max-w-4xl mx-auto">
         <CardContent className="p-6">
-          <div className="text-center text-muted-foreground">
+          <div className="text-center text-gray-500">
             加载评论中...
           </div>
         </CardContent>
@@ -77,7 +77,7 @@ export function CommentBox({ siteId, pageId }: CommentBoxProps) {
     return (
       <Card className="w-full max-w-4xl mx-auto">
         <CardContent className="p-6">
-          <div className="text-center text-red-500">
+          <div className="text-center text-red-600">
             {error}
           </div>
         </CardContent>
@@ -111,7 +111,7 @@ export function CommentBox({ siteId, pageId }: CommentBoxProps) {
       />
 
       <div className="flex justify-center gap-4">
-        <Button variant="link" asChild className="text-xs font-normal text-muted-foreground">
+        <Button variant="link" asChild className="text-xs font-normal text-gray-500">
           <Link href="https://github.com/uvexz/ascs" target='_blank'>
               A SIMPLE COMMENT SYSTEM
           </Link>

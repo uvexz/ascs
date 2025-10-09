@@ -1,11 +1,11 @@
 # ASCS - A Simple Comment System 🚀
 
-基于 Next.js 和 shadcn/ui 构建的现代化、轻量且易于部署的博客评论系统。
+基于 Next.js 和 Base UI 构建的现代化、轻量且易于部署的博客评论系统。
 
 ## 🛠️ 技术栈
 
 - **框架**: Next.js 15 (App Router)
-- **UI 组件**: shadcn/ui
+- **UI 组件**: Base UI
 - **样式**: Tailwind CSS
 - **图标**: Lucide React
 - **数据库**: PostgreSQL

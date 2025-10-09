@@ -10,14 +10,11 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@base-ui-components/react": "^1.0.0-beta.4",
     "@cap.js/server": "^3.0.1",
     "@cap.js/widget": "^0.1.28",
     "@prisma/client": "^6.16.0",
-    "@radix-ui/react-avatar": "^1.1.10",
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-tabs": "^1.1.13",
     "@tailwindcss/typography": "^0.5.16",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",

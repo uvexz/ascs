@@ -288,42 +288,42 @@ export function CommentForm({
                 required
                 className="resize-none"
               />
-              <div className="mt-2 text-xs text-muted-foreground">
+              <div className="mt-2 text-xs text-gray-500">
                 支持 Markdown 格式：
                 <Badge
                   variant="secondary"
-                  className="text-xs font-normal text-muted-foreground me-1"
+                  className="text-xs font-normal text-gray-500 me-1"
                 >
                   **粗体**
                 </Badge>
                 <Badge
                   variant="secondary"
-                  className="text-xs font-normal text-muted-foreground me-1"
+                  className="text-xs font-normal text-gray-500 me-1"
                 >
                   *斜体*
                 </Badge>
                 <Badge
                   variant="secondary"
-                  className="text-xs font-normal text-muted-foreground me-1"
+                  className="text-xs font-normal text-gray-500 me-1"
                 >
                   `代码`
                 </Badge>
                 <Badge
                   variant="secondary"
-                  className="text-xs font-normal text-muted-foreground me-1"
+                  className="text-xs font-normal text-gray-500 me-1"
                 >
                   [链接](url)
                 </Badge>
                 <Badge
                   variant="secondary"
-                  className="text-xs font-normal text-muted-foreground me-1"
+                  className="text-xs font-normal text-gray-500 me-1"
                 >
                   &gt; 引用
                 </Badge>
               </div>
             </TabsContent>
             <TabsContent value="preview" className="mt-2">
-              <div className="min-h-[150px] p-4 border rounded-md bg-muted/50">
+              <div className="min-h-[150px] p-4 border border-gray-200 rounded-md bg-gray-50">
                 {content ? (
                   <div className="prose prose-sm max-w-none">
                     <ReactMarkdown
@@ -350,7 +350,7 @@ export function CommentForm({
                         code: ({ children, ...props }: any) => {
                           return (
                             <code
-                              className="bg-muted px-1 py-0.5 rounded text-xs font-mono"
+                              className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono"
                               {...props}
                             >
                               {children}
@@ -358,12 +358,12 @@ export function CommentForm({
                           );
                         },
                         pre: ({ children }) => (
-                          <pre className="bg-muted p-3 rounded-md overflow-x-auto my-2 text-xs">
+                          <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto my-2 text-xs">
                             {children}
                           </pre>
                         ),
                         blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-border pl-4 my-2 text-muted-foreground italic">
+                          <blockquote className="border-l-4 border-gray-200 pl-4 my-2 text-gray-600 italic">
                             {children}
                           </blockquote>
                         ),
@@ -385,7 +385,7 @@ export function CommentForm({
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-primary hover:underline"
+                            className="text-blue-600 hover:underline"
                           >
                             {children}
                           </a>
@@ -396,7 +396,7 @@ export function CommentForm({
                     </ReactMarkdown>
                   </div>
                 ) : (
-                  <div className="text-muted-foreground text-center py-8">
+                  <div className="text-gray-500 text-center py-8">
                     在编辑标签页输入内容，然后切换到预览查看效果
                   </div>
                 )}
