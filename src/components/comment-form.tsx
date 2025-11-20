@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,54 +50,75 @@ export function CommentForm({
   const [captchaSolutions, setCaptchaSolutions] = useState<any>(null);
   const [captchaLoaded, setCaptchaLoaded] = useState(false);
 
-  // 从 cookies 加载用户信息
+  // 从 cookies 加载用户信息（同步读取，避免闪烁）
+  const [userInfoLoaded, setUserInfoLoaded] = useState(false);
+
   useEffect(() => {
-    const savedAuthor = Cookies.get("ascs-author");
-    const savedEmail = Cookies.get("ascs-email");
-    const savedWebsite = Cookies.get("ascs-website");
+    if (!userInfoLoaded) {
+      const savedAuthor = Cookies.get("ascs-author");
+      const savedEmail = Cookies.get("ascs-email");
+      const savedWebsite = Cookies.get("ascs-website");
 
-    if (savedAuthor) setAuthor(savedAuthor);
-    if (savedEmail) setEmail(savedEmail);
-    if (savedWebsite) setWebsite(savedWebsite);
-  }, []);
+      if (savedAuthor) setAuthor(savedAuthor);
+      if (savedEmail) setEmail(savedEmail);
+      if (savedWebsite) setWebsite(savedWebsite);
+      
+      setUserInfoLoaded(true);
+    }
+  }, [userInfoLoaded]);
 
-  // 加载 Cap.js 脚本
+  // 加载 Cap.js 脚本（只加载一次）
   useEffect(() => {
-    const loadCapScript = () => {
-      if (window.Cap) {
-        setCaptchaLoaded(true);
-        return;
-      }
+    // 检查是否已经加载
+    if (window.Cap) {
+      setCaptchaLoaded(true);
+      return;
+    }
 
-      // 设置 WASM URL（如果需要）
-      (window as any).CAP_CUSTOM_WASM_URL =
-        "https://use.sevencdn.com/npm/@cap.js/wasm/browser/cap_wasm.min.js";
+    // 检查是否已经有脚本在加载中
+    const existingScript = document.querySelector('script[src*="@cap.js/widget"]');
+    if (existingScript) {
+      // 等待现有脚本加载完成
+      const checkInterval = setInterval(() => {
+        if (window.Cap) {
+          setCaptchaLoaded(true);
+          clearInterval(checkInterval);
+        }
+      }, 100);
+      
+      // 10秒超时
+      setTimeout(() => clearInterval(checkInterval), 10000);
+      return;
+    }
 
-      const script = document.createElement("script");
-      script.src = "https://use.sevencdn.com/npm/@cap.js/widget";
-      script.onload = () => {
-        console.log("Cap.js script loaded successfully");
-        setCaptchaLoaded(true);
-      };
-      script.onerror = () => {
-        console.error("Failed to load Cap.js script");
-        setSubmitMessage("无法加载验证组件");
-        setSubmitMessageType("error");
-      };
-      document.head.appendChild(script);
+    // 设置 WASM URL
+    (window as any).CAP_CUSTOM_WASM_URL =
+      "https://use.sevencdn.com/npm/@cap.js/wasm/browser/cap_wasm.min.js";
+
+    const script = document.createElement("script");
+    script.src = "https://use.sevencdn.com/npm/@cap.js/widget";
+    script.async = true;
+    script.onload = () => {
+      setCaptchaLoaded(true);
     };
-
-    loadCapScript();
+    script.onerror = () => {
+      console.error("Failed to load Cap.js script");
+      setSubmitMessage("无法加载验证组件");
+      setSubmitMessageType("error");
+    };
+    document.head.appendChild(script);
   }, []);
 
-  // 初始化 CAPTCHA
+  // 初始化 CAPTCHA（使用 ref 避免重复创建）
   const [capInstance, setCapInstance] = useState<any>(null);
   const [isCapSolving, setIsCapSolving] = useState(false);
+  const capInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (captchaLoaded && !capInstance) {
+    if (captchaLoaded && !capInstance && !capInitializedRef.current) {
+      capInitializedRef.current = true;
+      
       try {
-        // 使用 invisible mode
         const cap = new (window as any).Cap({
           apiEndpoint: "/api/",
         });
@@ -120,6 +141,7 @@ export function CommentForm({
         console.error("Failed to create Cap instance:", error);
         setSubmitMessage("无法初始化验证组件");
         setSubmitMessageType("error");
+        capInitializedRef.current = false;
       }
     }
   }, [captchaLoaded, capInstance]);

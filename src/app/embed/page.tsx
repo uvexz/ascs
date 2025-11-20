@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,20 +27,28 @@ function EmbedContent() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const containerRef = useRef<HTMLDivElement>(null)
+    const resizeObserverRef = useRef<ResizeObserver | null>(null)
+    const rafRef = useRef<number | null>(null)
 
-    // 发送高度变化消息给父窗口
-    const sendHeightToParent = () => {
-        if (containerRef.current && window.parent !== window) {
-            const height = containerRef.current.scrollHeight
-            window.parent.postMessage({
-                type: 'ascs-resize',
-                height: height + 20 // 添加一些边距
-            }, '*')
+    // 使用 RAF 节流的高度更新
+    const sendHeightToParent = useCallback(() => {
+        if (rafRef.current) {
+            cancelAnimationFrame(rafRef.current)
         }
-    }
+
+        rafRef.current = requestAnimationFrame(() => {
+            if (containerRef.current && window.parent !== window) {
+                const height = containerRef.current.scrollHeight
+                window.parent.postMessage({
+                    type: 'ascs-resize',
+                    height: height + 20
+                }, '*')
+            }
+        })
+    }, [])
 
     // 加载评论
-    const loadComments = async () => {
+    const loadComments = useCallback(async () => {
         if (!siteId || !pageId) {
             setError('缺少必要参数')
             setLoading(false)
@@ -60,40 +68,40 @@ function EmbedContent() {
         } finally {
             setLoading(false)
         }
-    }
-
-    // 评论添加后的回调
-    const handleCommentAdded = () => {
-        loadComments()
-    }
-
-    useEffect(() => {
-        loadComments()
     }, [siteId, pageId])
 
-    // 监听内容变化，更新高度
+    // 评论添加后的回调
+    const handleCommentAdded = useCallback(() => {
+        loadComments()
+    }, [loadComments])
+
+    // 初始加载评论
     useEffect(() => {
+        loadComments()
+    }, [loadComments])
+
+    // 设置 ResizeObserver（只创建一次）
+    useEffect(() => {
+        if (!containerRef.current) return
+
+        resizeObserverRef.current = new ResizeObserver(() => {
+            sendHeightToParent()
+        })
+
+        resizeObserverRef.current.observe(containerRef.current)
+
+        // 初始高度
         sendHeightToParent()
 
-        // 使用 ResizeObserver 监听容器大小变化
-        if (containerRef.current) {
-            const resizeObserver = new ResizeObserver(() => {
-                sendHeightToParent()
-            })
-
-            resizeObserver.observe(containerRef.current)
-
-            return () => {
-                resizeObserver.disconnect()
+        return () => {
+            if (resizeObserverRef.current) {
+                resizeObserverRef.current.disconnect()
+            }
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current)
             }
         }
-    }, [comments, loading, error])
-
-    // 初始高度设置
-    useEffect(() => {
-        const timer = setTimeout(sendHeightToParent, 100)
-        return () => clearTimeout(timer)
-    }, [])
+    }, [sendHeightToParent])
 
     if (!siteId || !pageId) {
         return (

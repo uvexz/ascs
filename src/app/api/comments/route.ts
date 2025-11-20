@@ -50,7 +50,12 @@ export async function GET(request: NextRequest) {
 
     const comments = await buildCommentTree()
 
-    return createCorsResponse(comments)
+    // 添加缓存头
+    return createCorsResponse(comments, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+      },
+    })
   } catch (error) {
     console.error('Error fetching comments:', error)
     return createCorsResponse(

@@ -119,6 +119,21 @@
   `;
   container.innerHTML = loadingHtml;
   
+  // 监听 iframe 高度变化（提前设置，避免丢失消息）
+  const messageHandler = function(event) {
+    // 验证消息来源
+    if (event.origin !== ASCS_HOST) return;
+    
+    if (event.data && event.data.type === 'ascs-resize') {
+      const height = parseInt(event.data.height);
+      if (height && height > 0 && window.ASCS_IFRAME) {
+        window.ASCS_IFRAME.style.height = height + 'px';
+      }
+    }
+  };
+  
+  window.addEventListener('message', messageHandler);
+  
   // 获取站点信息
   fetch(`${ASCS_HOST}/api/sites?host=${encodeURIComponent(currentHostname)}`)
     .then(response => {
@@ -137,25 +152,15 @@
       iframe.src = iframeSrc;
       iframe.style.width = '100%';
       iframe.style.border = 'none';
-      iframe.style.minHeight = '400px';
+      iframe.style.minHeight = '200px';
+      iframe.style.height = '400px';
       iframe.style.borderRadius = '8px';
       iframe.setAttribute('scrolling', 'no');
       iframe.setAttribute('title', 'ASCS 评论系统');
+      iframe.setAttribute('loading', 'lazy');
       
-      // 监听 iframe 高度变化
-      const messageHandler = function(event) {
-        // 验证消息来源
-        if (event.origin !== ASCS_HOST) return;
-        
-        if (event.data && event.data.type === 'ascs-resize') {
-          const height = parseInt(event.data.height);
-          if (height && height > 0) {
-            iframe.style.height = height + 'px';
-          }
-        }
-      };
-      
-      window.addEventListener('message', messageHandler);
+      // 保存 iframe 引用
+      window.ASCS_IFRAME = iframe;
       
       // iframe 加载完成后的处理
       iframe.onload = function() {
@@ -171,9 +176,10 @@
       container.innerHTML = '';
       container.appendChild(iframe);
       
-      // 清理函数（可选）
+      // 清理函数
       window.ASCS_CLEANUP = function() {
         window.removeEventListener('message', messageHandler);
+        window.ASCS_IFRAME = null;
         if (container && container.parentNode) {
           container.innerHTML = '';
         }

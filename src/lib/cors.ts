@@ -11,7 +11,7 @@ export function corsHeaders(origin?: string) {
 
 export function handleCors(request: NextRequest, response: NextResponse) {
   const origin = request.headers.get('origin')
-  const headers = corsHeaders(origin)
+  const headers = corsHeaders(origin || undefined)
   
   Object.entries(headers).forEach(([key, value]) => {
     response.headers.set(key, value)
@@ -20,13 +20,20 @@ export function handleCors(request: NextRequest, response: NextResponse) {
   return response
 }
 
-export function createCorsResponse(data: any, options: { status?: number } = {}) {
+export function createCorsResponse(data: any, options: { status?: number; headers?: Record<string, string> } = {}) {
   const response = NextResponse.json(data, { status: options.status || 200 })
   
   // 添加 CORS 头
   Object.entries(corsHeaders()).forEach(([key, value]) => {
     response.headers.set(key, value)
   })
+  
+  // 添加自定义头
+  if (options.headers) {
+    Object.entries(options.headers).forEach(([key, value]) => {
+      response.headers.set(key, value)
+    })
+  }
   
   return response
 }
