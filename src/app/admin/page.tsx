@@ -5,15 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Settings, LogOut } from 'lucide-react'
 import { Navigation } from '@/components/navigation'
-import {
-  Site,
-  Comment,
-  PaginationInfo,
-  SiteManagement,
-  CommentManagement,
-  ConfigModal,
-  EmbedModal,
-} from './components'
+import { Site, Comment, PaginationInfo } from './components/types'
+import { SiteManagement } from './components/site-management'
+import { CommentManagement } from './components/comment-management'
+import { ConfigModal } from './components/config-modal'
+import { EmbedModal } from './components/embed-modal'
 
 const COMMENTS_PER_PAGE = 20
 
@@ -25,7 +21,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [showConfig, setShowConfig] = useState(false)
   const [showEmbedSite, setShowEmbedSite] = useState<Site | null>(null)
-  
+
   // 分页状态
   const [commentsPagination, setCommentsPagination] = useState<PaginationInfo>({
     total: 0,
