@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   try {
     await requireAuth(request)
 
-    const { id, baseUrl, model, apiKey, isEnabled } = await request.json()
+    const { baseUrl, model, apiKey, isEnabled } = await request.json()
 
     // 验证必填字段
     if (!baseUrl || !model || !apiKey) {

@@ -1,15 +1,17 @@
 # ASCS - A Simple Comment System 🚀
 
-基于 Next.js 和 Base UI 构建的现代化、轻量且易于部署的博客评论系统。
+基于 Next.js 和 Tailwind CSS 构建的现代化、轻量且易于部署的博客评论系统。
 
 ## 🛠️ 技术栈
 
 - **框架**: Next.js 15 (App Router)
-- **UI 组件**: Base UI
-- **样式**: Tailwind CSS
+- **UI 组件**: shadcn/ui 风格自定义组件 + Radix UI
+- **样式**: Tailwind CSS 4
 - **图标**: Lucide React
 - **数据库**: PostgreSQL
 - **ORM**: Prisma
+- **验证码**: Cap.js
+- **缓存**: Redis (可选，用于多实例部署)
 - **语言**: TypeScript
 
 ## 🚀 快速开始
@@ -41,6 +43,9 @@ cp .env.example .env
 DATABASE_URL="postgresql://username:password@localhost:5432/ascs_db?schema=public"
 NEXTAUTH_SECRET="your-secret-key-here"
 NEXTAUTH_URL="http://localhost:3000"
+
+# 可选：Redis 配置（用于多实例部署的速率限制和 CAPTCHA 存储）
+# REDIS_URL="redis://localhost:6379"
 ```
 
 ### 4. 初始化数据库

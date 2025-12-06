@@ -133,11 +133,8 @@ export function CommentItem({
                 h1: ({ children }) => <h1 className="text-lg font-semibold my-2">{children}</h1>,
                 h2: ({ children }) => <h2 className="text-base font-semibold my-2">{children}</h2>,
                 h3: ({ children }) => <h3 className="text-sm font-semibold my-2">{children}</h3>,
-                code: ({ inline, children, ...props }) => {
-                  if (inline) {
-                    return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
-                  }
-                  return <code {...props}>{children}</code>
+                code: ({ children, ...props }) => {
+                  return <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono" {...props}>{children}</code>
                 },
                 pre: ({ children }) => (
                   <pre className="bg-gray-100 p-3 rounded-md overflow-x-auto my-2 text-xs">

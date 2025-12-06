@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { notifyNewComment } from '@/lib/notifications'
 import { aiDetectionService } from '@/lib/ai-detection'
@@ -23,8 +23,23 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    interface CommentWithReplies {
+      id: string;
+      content: string;
+      author: string;
+      email: string | null;
+      website: string | null;
+      pageId: string;
+      status: string;
+      createdAt: Date;
+      updatedAt: Date;
+      siteId: string;
+      parentId: string | null;
+      replies: CommentWithReplies[];
+    }
+
     // 递归获取所有评论及其回复（只包括已批准的评论）
-    const buildCommentTree = async (parentId: string | null = null): Promise<any[]> => {
+    const buildCommentTree = async (parentId: string | null = null): Promise<CommentWithReplies[]> => {
       const comments = await prisma.comment.findMany({
         where: {
           siteId,
@@ -98,10 +113,11 @@ export async function POST(request: NextRequest) {
     // 获取客户端 IP 地址
     const ip = getClientIP(request)
     
-    // 检查速率限制
-    if (commentRateLimiter.isRateLimited(ip)) {
+    // 检查速率限制（异步）
+    const isLimited = await commentRateLimiter.isRateLimited(ip)
+    if (isLimited) {
       return createCorsResponse(
-        { error: 'Too many requests. Please wait 1 second before submitting another comment.' },
+        { error: 'Too many requests. Please wait a few seconds before submitting another comment.' },
         { status: 429 }
       )
     }
@@ -198,7 +214,7 @@ export async function POST(request: NextRequest) {
               hostname: siteInfo.hostname,
               name: siteInfo.name || undefined,
             }
-          ).catch((error: any) => {
+          ).catch((error: unknown) => {
             console.error('Failed to send pending comment notification:', error)
           })
         }
@@ -240,7 +256,7 @@ export async function POST(request: NextRequest) {
           hostname: site.hostname,
           name: site.name || undefined,
         }
-      ).catch((error: any) => {
+      ).catch((error: unknown) => {
         console.error('Failed to send notification:', error)
       })
     }

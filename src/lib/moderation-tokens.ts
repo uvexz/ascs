@@ -4,7 +4,7 @@ import crypto from 'crypto'
 export interface ModerationTokenData {
   id: string
   token: string
-  action: 'approve' | 'delete'
+  action: string
   isUsed: boolean
   createdAt: Date
   expiresAt: Date

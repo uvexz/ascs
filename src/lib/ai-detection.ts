@@ -35,13 +35,16 @@ export class AIDetectionService {
     }
   }
 
-  async detectSpam(content: string, author: string): Promise<DetectionResult> {
+  async detectSpam(content: string, author: string, email?: string, website?: string): Promise<DetectionResult> {
     if (!this.config || !this.config.isEnabled) {
       return { isSpam: false, confidence: 0 }
     }
 
     try {
-      const userPrompt = `你是一个反垃圾评论系统助手。请分析下面的评论内容，评估其为垃圾评论的风险度。评论内容: ${content} 作者: ${author} 评估标准：1. 广告或推广内容 2. 无意义或重复内容 3. 包含恶意链接 4. 包含不当或攻击性言论 5. 明显的机器生成内容 6. 但不要对无网址的评论太严格，以避免屏蔽了正常用户的评论。 请只返回一个 0.1-0.9 之间的数字，表示垃圾评论的风险度：0.1-0.3：正常评论，风险很低； 0.3-0.7：可能有问题，需要进一步检查； 0.7-0.9：很可能是垃圾评论。只返回数字，不要包含任何其他文本或解释。`
+      // 构建包含可选信息的提示
+      const emailInfo = email ? ` 邮箱: ${email}` : ''
+      const websiteInfo = website ? ` 网站: ${website}` : ''
+      const userPrompt = `你是一个反垃圾评论系统助手。请分析下面的评论内容，评估其为垃圾评论的风险度。评论内容: ${content} 作者: ${author}${emailInfo}${websiteInfo} 评估标准：1. 广告或推广内容 2. 无意义或重复内容 3. 包含恶意链接 4. 包含不当或攻击性言论 5. 明显的机器生成内容 6. 但不要对无网址的评论太严格，以避免屏蔽了正常用户的评论。 请只返回一个 0.1-0.9 之间的数字，表示垃圾评论的风险度：0.1-0.3：正常评论，风险很低； 0.3-0.7：可能有问题，需要进一步检查； 0.7-0.9：很可能是垃圾评论。只返回数字，不要包含任何其他文本或解释。`
 
       // 确保 baseUrl 不以 / 结尾，避免双斜杠
       const baseUrl = this.config.baseUrl.endsWith('/') ? this.config.baseUrl.slice(0, -1) : this.config.baseUrl

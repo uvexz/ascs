@@ -1,21 +1,19 @@
-// 速率限制工具
-// 使用内存存储来跟踪 IP 请求时间
+/**
+ * 速率限制工具
+ * 支持内存存储（单实例）和 Redis 存储（多实例）
+ */
 
-interface RateLimitRecord {
-  lastRequest: number
-}
+import { getStorageAdapter, StorageAdapter } from './storage'
 
 class RateLimiter {
-  private records: Map<string, RateLimitRecord> = new Map()
+  private storage: StorageAdapter
   private windowMs: number // 时间窗口（毫秒）
-  private maxRequests: number // 最大请求数
+  private keyPrefix: string
 
-  constructor(windowMs: number = 1000, maxRequests: number = 1) {
+  constructor(windowMs: number = 1000, keyPrefix: string = 'ratelimit') {
     this.windowMs = windowMs
-    this.maxRequests = maxRequests
-    
-    // 定期清理过期的记录，防止内存泄漏
-    setInterval(() => this.cleanup(), 60000) // 每分钟清理一次
+    this.keyPrefix = keyPrefix
+    this.storage = getStorageAdapter()
   }
 
   /**
@@ -23,21 +21,24 @@ class RateLimiter {
    * @param ip 客户端 IP 地址
    * @returns 如果超过限制返回 true，否则返回 false
    */
-  isRateLimited(ip: string): boolean {
+  async isRateLimited(ip: string): Promise<boolean> {
+    const key = `${this.keyPrefix}:${ip}`
     const now = Date.now()
-    const record = this.records.get(ip)
 
-    if (!record) {
+    const lastRequestStr = await this.storage.get(key)
+
+    if (!lastRequestStr) {
       // 第一次请求，创建记录
-      this.records.set(ip, { lastRequest: now })
+      await this.storage.set(key, now.toString(), Math.ceil(this.windowMs / 1000))
       return false
     }
 
-    const timeSinceLastRequest = now - record.lastRequest
-    
+    const lastRequest = parseInt(lastRequestStr, 10)
+    const timeSinceLastRequest = now - lastRequest
+
     if (timeSinceLastRequest >= this.windowMs) {
       // 时间窗口已过，重置记录
-      record.lastRequest = now
+      await this.storage.set(key, now.toString(), Math.ceil(this.windowMs / 1000))
       return false
     }
 
@@ -45,30 +46,10 @@ class RateLimiter {
     return true
   }
 
-  /**
-   * 清理过期的记录
-   */
-  private cleanup(): void {
-    const now = Date.now()
-    const cutoff = now - this.windowMs
-
-    for (const [ip, record] of this.records.entries()) {
-      if (record.lastRequest < cutoff) {
-        this.records.delete(ip)
-      }
-    }
-  }
-
-  /**
-   * 获取当前记录数（用于调试）
-   */
-  getRecordCount(): number {
-    return this.records.size
-  }
 }
 
 // 创建评论提交的速率限制器（每 3 秒最多 1 次请求）
-const commentRateLimiter = new RateLimiter(3000, 1)
+const commentRateLimiter = new RateLimiter(3000, 'comment')
 
 export { commentRateLimiter }
 export default RateLimiter

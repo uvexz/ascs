@@ -20,7 +20,7 @@ export function handleCors(request: NextRequest, response: NextResponse) {
   return response
 }
 
-export function createCorsResponse(data: any, options: { status?: number; headers?: Record<string, string> } = {}) {
+export function createCorsResponse(data: unknown, options: { status?: number; headers?: Record<string, string> } = {}) {
   const response = NextResponse.json(data, { status: options.status || 200 })
   
   // 添加 CORS 头

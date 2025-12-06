@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAuth(request)
+
     const sites = await prisma.site.findMany({
       include: {
         _count: {
@@ -14,6 +17,9 @@ export async function GET() {
 
     return NextResponse.json(sites)
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error fetching sites:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -24,6 +30,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAuth(request)
+
     const body = await request.json()
     const { hostname, name, description, alternateHostnames } = body
 
@@ -57,6 +65,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(site, { status: 201 })
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error creating site:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

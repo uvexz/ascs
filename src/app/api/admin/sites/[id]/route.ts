@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth'
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAuth(request)
+
+    const { id: siteId } = await params
     const body = await request.json()
     const { hostname, name, description, alternateHostnames } = body
-    const siteId = params.id
 
     if (!hostname) {
       return NextResponse.json(
@@ -61,6 +64,9 @@ export async function PUT(
 
     return NextResponse.json(updatedSite)
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error updating site:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -71,10 +77,12 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const siteId = params.id
+    await requireAuth(request)
+
+    const { id: siteId } = await params
 
     // 检查站点是否存在
     const existingSite = await prisma.site.findUnique({
@@ -103,6 +111,9 @@ export async function DELETE(
       deletedComments: existingSite._count.comments 
     })
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error deleting site:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

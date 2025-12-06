@@ -55,6 +55,7 @@ export function CommentBox({ siteId, pageId }: CommentBoxProps) {
     if (siteId && pageId) {
       fetchComments()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [siteId, pageId])
 
   const handleCommentAdded = () => {

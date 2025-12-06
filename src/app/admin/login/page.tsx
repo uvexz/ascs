@@ -67,7 +67,7 @@ export default function AdminLoginPage() {
         const data = await response.json()
         setError(data.error || '登录失败')
       }
-    } catch (error) {
+    } catch {
       setError('登录失败，请重试')
     } finally {
       setLoading(false)
@@ -110,7 +110,7 @@ export default function AdminLoginPage() {
         const data = await response.json()
         setError(data.error || '设置失败')
       }
-    } catch (error) {
+    } catch {
       setError('设置失败，请重试')
     } finally {
       setLoading(false)

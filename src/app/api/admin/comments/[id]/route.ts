@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    await requireAuth(request)
+
+    const { id: commentId } = await params
 
     // 检查评论是否存在
     const existingComment = await prisma.comment.findUnique({
@@ -29,6 +32,9 @@ export async function DELETE(
       message: '评论删除成功'
     })
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error deleting comment:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -39,10 +45,12 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    await requireAuth(request)
+
+    const { id: commentId } = await params
     const body = await request.json()
     const { status } = body
 
@@ -76,6 +84,9 @@ export async function PATCH(
       comment: updatedComment
     })
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error updating comment status:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

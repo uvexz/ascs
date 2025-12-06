@@ -15,9 +15,19 @@ import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
 
 // 声明全局 Cap 类型
+interface CapInstance {
+  solve: () => Promise<{ token: string; solutions: unknown[] }>;
+  addEventListener: (event: string, handler: (e: { detail: { progress?: number; message?: string } }) => void) => void;
+}
+
+interface CapConstructor {
+  new (options: { apiEndpoint: string }): CapInstance;
+}
+
 declare global {
   interface Window {
-    Cap: any;
+    Cap: CapConstructor;
+    CAP_CUSTOM_WASM_URL: string;
   }
 }
 
@@ -47,7 +57,7 @@ export function CommentForm({
     "success" | "error" | "warning"
   >("success");
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const [captchaSolutions, setCaptchaSolutions] = useState<any>(null);
+  const [captchaSolutions, setCaptchaSolutions] = useState<unknown[] | null>(null);
   const [captchaLoaded, setCaptchaLoaded] = useState(false);
 
   // 从 cookies 加载用户信息（同步读取，避免闪烁）
@@ -92,7 +102,7 @@ export function CommentForm({
     }
 
     // 设置 WASM URL
-    (window as any).CAP_CUSTOM_WASM_URL =
+    window.CAP_CUSTOM_WASM_URL =
       "https://use.sevencdn.com/npm/@cap.js/wasm/browser/cap_wasm.min.js";
 
     const script = document.createElement("script");
@@ -110,7 +120,7 @@ export function CommentForm({
   }, []);
 
   // 初始化 CAPTCHA（使用 ref 避免重复创建）
-  const [capInstance, setCapInstance] = useState<any>(null);
+  const [capInstance, setCapInstance] = useState<CapInstance | null>(null);
   const [isCapSolving, setIsCapSolving] = useState(false);
   const capInitializedRef = useRef(false);
 
@@ -119,15 +129,15 @@ export function CommentForm({
       capInitializedRef.current = true;
       
       try {
-        const cap = new (window as any).Cap({
+        const cap = new window.Cap({
           apiEndpoint: "/api/",
         });
 
-        cap.addEventListener("progress", (e: any) => {
+        cap.addEventListener("progress", (e) => {
           console.log("CAPTCHA progress:", e.detail.progress + "%");
         });
 
-        cap.addEventListener("error", (e: any) => {
+        cap.addEventListener("error", (e) => {
           console.error("CAPTCHA error:", e.detail);
           setSubmitMessage(
             `CAPTCHA 错误: ${e.detail.message || "Unknown error"}`,
@@ -369,7 +379,7 @@ export function CommentForm({
                             {children}
                           </h3>
                         ),
-                        code: ({ children, ...props }: any) => {
+                        code: ({ children, ...props }) => {
                           return (
                             <code
                               className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono"

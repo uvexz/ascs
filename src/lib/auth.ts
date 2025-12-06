@@ -3,7 +3,19 @@ import jwt from 'jsonwebtoken'
 import { NextRequest } from 'next/server'
 import { prisma } from './prisma'
 
-const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'your-secret-key'
+function getJwtSecret(): string {
+  const secret = process.env.NEXTAUTH_SECRET
+  if (!secret) {
+    // 在构建时允许缺少环境变量，但在运行时会抛出错误
+    if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PHASE) {
+      throw new Error('NEXTAUTH_SECRET environment variable is required')
+    }
+    return 'build-time-placeholder'
+  }
+  return secret
+}
+
+const JWT_SECRET = getJwtSecret()
 
 export interface JWTPayload {
   userId: string

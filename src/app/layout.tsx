@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ASCS - A Simple Comment System",
-  description: "基于 Next.js 和 shadcn/ui 构建的现代化、轻量且易于部署的博客评论系统",
+  description: "基于 Next.js 和 Tailwind CSS 构建的现代化、轻量且易于部署的博客评论系统",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

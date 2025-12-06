@@ -4,11 +4,10 @@ import { verifyModerationToken, markTokenAsUsed } from '@/lib/moderation-tokens'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; token: string } }
+  { params }: { params: Promise<{ id: string; token: string }> }
 ) {
   try {
-    const commentId = params.id
-    const token = params.token
+    const { id: commentId, token } = await params
     const { searchParams } = new URL(request.url)
     const action = searchParams.get('action') // 'approve' 或 'delete'
     const confirmed = searchParams.get('confirmed') === 'true'
@@ -79,7 +78,15 @@ export async function GET(
   }
 }
 
-function renderModerationPage(commentId: string, token: string, comment: any) {
+interface CommentData {
+  siteId?: string;
+  pageId?: string;
+  author: string;
+  content: string;
+  createdAt: Date;
+}
+
+function renderModerationPage(commentId: string, token: string, comment: CommentData) {
   const html = `
     <!DOCTYPE html>
     <html lang="zh-CN">
@@ -217,7 +224,7 @@ function renderModerationPage(commentId: string, token: string, comment: any) {
   })
 }
 
-function renderSuccessPage(action: string, comment: any, message: string) {
+function renderSuccessPage(action: string, comment: CommentData, message: string) {
   const actionColor = action === '审核通过' ? '#10b981' : '#ef4444'
   const actionIcon = action === '审核通过' ? '✅' : '🗑️'
   

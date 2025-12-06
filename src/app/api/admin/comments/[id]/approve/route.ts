@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const commentId = params.id
+    await requireAuth(request)
+
+    const { id: commentId } = await params
 
     // 检查评论是否存在
     const existingComment = await prisma.comment.findUnique({
@@ -100,6 +103,9 @@ export async function GET(
       },
     })
   } catch (error) {
+    if (error instanceof Error && error.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     console.error('Error approving comment:', error)
     
     // 返回错误页面
