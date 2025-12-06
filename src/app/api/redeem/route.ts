@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { capInstance } from '@/lib/cap-instance'
+import { getCapInstance } from '@/lib/cap-instance'
 
 export async function POST(request: NextRequest) {
     try {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
         }
 
         console.log('Redeeming challenge with:', { token, solutions })
-        const result = await capInstance.redeemChallenge({ token, solutions })
+        const result = await getCapInstance().redeemChallenge({ token, solutions })
         console.log('Redeem result:', result)
         return NextResponse.json(result)
     } catch (error) {

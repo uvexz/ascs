@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
-import { capInstance } from '@/lib/cap-instance'
+import { getCapInstance } from '@/lib/cap-instance'
 
 export async function POST() {
     try {
-        const challenge = await capInstance.createChallenge()
+        const challenge = await getCapInstance().createChallenge()
         return NextResponse.json(challenge)
     } catch (error) {
         console.error('Error creating cap challenge:', error)

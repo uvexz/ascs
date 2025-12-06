@@ -26,25 +26,27 @@ class CapStorageAdapter {
 // 检查是否配置了 Redis
 const redisUrl = process.env.REDIS_URL
 
-// 创建 Cap 实例
-// 如果配置了 Redis，使用自定义存储适配器
-// 否则使用默认的文件存储
-let capInstance: InstanceType<typeof Cap>
+// Singleton instance
+let instance: InstanceType<typeof Cap> | null = null
 
-if (redisUrl) {
-  console.log('Cap.js: Using Redis storage')
-  const storage = new CapStorageAdapter()
-  capInstance = new Cap({
-    // @ts-expect-error Cap.js 类型定义可能不完整
-    tokenStore: {
-      get: (key: string) => storage.get(key),
-      set: (key: string, value: string) => storage.set(key, value),
-      delete: (key: string) => storage.delete(key),
-    },
-  })
-} else {
-  console.log('Cap.js: Using default file storage')
-  capInstance = new Cap()
+export function getCapInstance() {
+  if (instance) return instance
+
+  if (redisUrl) {
+    console.log('Cap.js: Using Redis storage')
+    const storage = new CapStorageAdapter()
+    instance = new Cap({
+      // @ts-expect-error Cap.js 类型定义可能不完整
+      tokenStore: {
+        get: (key: string) => storage.get(key),
+        set: (key: string, value: string) => storage.set(key, value),
+        delete: (key: string) => storage.delete(key),
+      },
+    })
+  } else {
+    console.log('Cap.js: Using default file storage')
+    instance = new Cap()
+  }
+
+  return instance
 }
-
-export { capInstance }
