@@ -27,7 +27,7 @@
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.543.0",
-    "next": "^16.0.0",
+    "next": "^16.1.4",
     "nodemailer": "^7.0.6",
     "prisma": "^6.16.0",
     "react": "19.1.0",
@@ -48,7 +48,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "^16.0.0",
+    "eslint-config-next": "^16.1.4",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5"
