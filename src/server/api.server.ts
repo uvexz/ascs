@@ -376,10 +376,10 @@ async function toggleLike(request: Request) {
   )
 }
 
-async function dashboard(request: Request) {
+export async function dashboard(request: Request, siteId?: string) {
   const session = await requireSession(request)
   const admin = await isAdmin(session.user.id)
-  const selected = new URL(request.url).searchParams.get('site')
+  const selected = siteId ?? new URL(request.url).searchParams.get('site')
   let accessible: Array<
     typeof sites.$inferSelect & { role?: 'owner' | 'moderator' }
   >
@@ -565,67 +565,75 @@ async function adminComments(request: Request, siteId: string) {
 }
 export type AdminComments = Awaited<ReturnType<typeof adminComments>>
 
-async function manageSite(request: Request, siteId: string, action?: string) {
+export async function siteDetail(
+  request: Request,
+  siteId: string,
+): Promise<SiteDetail> {
   id.parse(siteId)
-  const { site, role } = await authorize(
+  const { site, role } = await authorize(request, siteId)
+  const [stats, banned, team, daily] = await Promise.all([
+    counts(siteId),
+    db
+      .select({
+        id: bans.id,
+        kind: bans.kind,
+        createdAt: bans.createdAt,
+        target: sql<
+          string | null
+        >`(select c.author from comments c where c.site_id = ${bans.siteId} and c.status != 'deleted' and ((${bans.kind} = 'user' and c.user_id = ${bans.value}) or (${bans.kind} = 'email' and c.email_hash = ${bans.value}) or (${bans.kind} = 'ip' and c.ip_hash = ${bans.value})) order by c.created_at desc limit 1)`,
+      })
+      .from(bans)
+      .where(eq(bans.siteId, siteId))
+      .orderBy(desc(bans.createdAt))
+      .limit(100),
+    role === 'owner'
+      ? db
+          .select({
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: members.role,
+          })
+          .from(members)
+          .innerJoin(user, eq(user.id, members.userId))
+          .where(eq(members.siteId, siteId))
+      : Promise.resolve([]),
+    db
+      .select({
+        day: sql<string>`date(${comments.createdAt}/1000, 'unixepoch')`,
+        count: sql<number>`count(*)`,
+      })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.siteId, siteId),
+          ne(comments.status, 'deleted'),
+          sql`${comments.createdAt} >= ${Date.now() - 7 * 86_400_000}`,
+        ),
+      )
+      .groupBy(sql`date(${comments.createdAt}/1000, 'unixepoch')`),
+  ])
+  return {
+    site,
+    role,
+    stats,
+    bans: banned,
+    members: team,
+    daily,
+    canBanIp: !!process.env.TRUSTED_IP_HEADER,
+  }
+}
+
+async function manageSite(request: Request, siteId: string, action?: string) {
+  if (!action && request.method === 'GET')
+    return json(await siteDetail(request, siteId))
+  id.parse(siteId)
+  const { site } = await authorize(
     request,
     siteId,
     ['verify', 'members', 'settings'].includes(action || '') ||
       request.method === 'PATCH',
   )
-  if (!action && request.method === 'GET') {
-    const [stats, banned, team, daily] = await Promise.all([
-      counts(siteId),
-      db
-        .select({
-          id: bans.id,
-          kind: bans.kind,
-          createdAt: bans.createdAt,
-          target: sql<
-            string | null
-          >`(select c.author from comments c where c.site_id = ${bans.siteId} and c.status != 'deleted' and ((${bans.kind} = 'user' and c.user_id = ${bans.value}) or (${bans.kind} = 'email' and c.email_hash = ${bans.value}) or (${bans.kind} = 'ip' and c.ip_hash = ${bans.value})) order by c.created_at desc limit 1)`,
-        })
-        .from(bans)
-        .where(eq(bans.siteId, siteId))
-        .orderBy(desc(bans.createdAt))
-        .limit(100),
-      role === 'owner'
-        ? db
-            .select({
-              id: user.id,
-              name: user.name,
-              email: user.email,
-              role: members.role,
-            })
-            .from(members)
-            .innerJoin(user, eq(user.id, members.userId))
-            .where(eq(members.siteId, siteId))
-        : Promise.resolve([]),
-      db
-        .select({
-          day: sql<string>`date(${comments.createdAt}/1000, 'unixepoch')`,
-          count: sql<number>`count(*)`,
-        })
-        .from(comments)
-        .where(
-          and(
-            eq(comments.siteId, siteId),
-            ne(comments.status, 'deleted'),
-            sql`${comments.createdAt} >= ${Date.now() - 7 * 86_400_000}`,
-          ),
-        )
-        .groupBy(sql`date(${comments.createdAt}/1000, 'unixepoch')`),
-    ])
-    return json({
-      site,
-      role,
-      stats,
-      bans: banned,
-      members: team,
-      daily,
-      canBanIp: !!process.env.TRUSTED_IP_HEADER,
-    })
-  }
   if (!action && request.method === 'PATCH') {
     await db
       .update(sites)

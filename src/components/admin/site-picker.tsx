@@ -8,6 +8,7 @@ import {
   PlusIcon,
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../../lib/api'
+import { queryKeys } from '../../lib/query-keys'
 import { Pagination } from '../pagination'
 import type { SiteList } from '../../server/api.server'
 
@@ -32,7 +33,7 @@ export function SiteSwitcher({
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
   const list = useQuery({
-    queryKey: ['site-picker', q, page],
+    queryKey: queryKeys.sitePicker(q, page),
     queryFn: ({ signal }) =>
       api<SiteList>(`sites?${queryString({ q, page })}`, { signal }),
   })

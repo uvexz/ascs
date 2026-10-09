@@ -4,6 +4,7 @@ import { Button, Input } from '@cloudflare/kumo'
 import { CheckIcon } from '@phosphor-icons/react'
 import { api, errorText, fieldError } from '../../lib/api'
 import { invalidateSiteCaches } from '../../lib/cache'
+import { queryKeys } from '../../lib/query-keys'
 import type { SiteSettings } from '../../lib/validation'
 import type { SiteDetail } from '../../server/api.server'
 
@@ -54,7 +55,13 @@ export function Settings({
     onSuccess: async () => {
       setDirty(false)
       setNotice('设置已保存。')
-      await invalidateSiteCaches(queryClient, detail.site.id)
+      await Promise.all([
+        invalidateSiteCaches(queryClient, detail.site.id),
+        // The site name shown in the sidebar picker may have changed.
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.scope.sitePicker,
+        }),
+      ])
     },
   })
   return (

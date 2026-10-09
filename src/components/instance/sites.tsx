@@ -90,7 +90,7 @@ export function Sites() {
                   </Button>
                   <a
                     className="text-link self-center"
-                    href={`/?site=${site.id}&view=comments`}
+                    href={`/admin/site/${site.id}/comments`}
                   >
                     管理评论
                   </a>

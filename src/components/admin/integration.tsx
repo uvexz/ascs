@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@cloudflare/kumo'
 import { ShieldCheckIcon } from '@phosphor-icons/react'
@@ -16,9 +16,10 @@ export function Integration({ detail }: { detail: SiteDetail }) {
       await invalidateSiteCaches(queryClient, detail.site.id)
     },
   })
-  const [origin] = useState(() =>
-    typeof window === 'undefined' ? '' : window.location.origin,
-  )
+  const [origin, setOrigin] = useState('')
+  useEffect(() => {
+    setOrigin(window.location.origin)
+  }, [])
   const hostname = new URL(detail.site.origin).hostname
   return (
     <>

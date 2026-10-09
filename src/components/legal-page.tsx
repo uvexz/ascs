@@ -13,19 +13,11 @@ export function LegalPage({
   return (
     <div className="legal-page">
       <header className="legal-header">
-        <Link
-          to="/"
-          search={{ view: 'comments', status: 'pending', page: 1 }}
-          className="brand"
-        >
+        <Link to="/admin" className="brand">
           <img src="/brand.svg" alt="" width="22" height="22" />
           <span>ASCS</span>
         </Link>
-        <Link
-          to="/"
-          search={{ view: 'comments', status: 'pending', page: 1 }}
-          className="text-link"
-        >
+        <Link to="/admin" className="text-link">
           返回管理后台
         </Link>
       </header>

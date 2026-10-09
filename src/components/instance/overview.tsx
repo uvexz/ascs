@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../lib/api'
+import { queryKeys } from '../../lib/query-keys'
 import { QueryError } from '../ui'
 import type { InstanceOverview } from '../../server/admin.server'
 
 export function Overview() {
   const query = useQuery({
-    queryKey: ['instance-admin', 'overview'],
+    queryKey: queryKeys.instance.overview(),
     queryFn: ({ signal }) =>
       api<InstanceOverview>('admin/overview', { signal }),
   })
@@ -28,7 +29,7 @@ export function Overview() {
         ].map(([label, count]) => (
           <div key={label}>
             <span className="text-muted">{label}</span>
-            <strong>{Number(count).toLocaleString()}</strong>
+            <strong>{Number(count).toLocaleString('zh-CN')}</strong>
           </div>
         ))}
       </div>

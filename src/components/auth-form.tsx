@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useRouter } from '@tanstack/react-router'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import {
@@ -9,6 +10,8 @@ import {
 } from '@phosphor-icons/react'
 import { authClient } from '../lib/auth-client'
 import { api, errorText, fieldError } from '../lib/api'
+import { resetAuthCaches } from '../lib/cache'
+import { queryKeys, staleTimes } from '../lib/query-keys'
 
 export function AuthForm({
   compact = false,
@@ -20,12 +23,14 @@ export function AuthForm({
   inFrame?: boolean
 }) {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(initialMode)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [notice, setNotice] = useState('')
   const providers = useQuery({
-    queryKey: ['auth-config'],
+    queryKey: queryKeys.authConfig(),
+    staleTime: staleTimes.static,
     queryFn: () =>
       api<{
         github: boolean
@@ -69,7 +74,11 @@ export function AuthForm({
             : await authClient.signIn.email({ email, password })
       if (result.error) throw new Error(result.error.message || '认证失败')
       if (mode === 'reset') setNotice('若账号存在，重置链接将发送到你的邮箱。')
-      else await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      else {
+        resetAuthCaches(queryClient)
+        // Re-run route guards so the admin shell reacts to the new session.
+        await router.invalidate()
+      }
     } catch (errorValue) {
       setError(errorValue)
     } finally {

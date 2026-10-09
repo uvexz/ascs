@@ -38,30 +38,17 @@ export type ProfileInput = z.infer<typeof profileInput>
 export const emailChangeInput = z.object({ email: z.email().max(254) }).strict()
 
 export const id = z.string().uuid()
-export const adminSearch = z.object({
-  site: id.optional().catch(undefined),
-  view: z
-    .enum([
-      'comments',
-      'statistics',
-      'integration',
-      'settings',
-      'members',
-      'system-overview',
-      'users',
-      'all-sites',
-      'system-settings',
-      'mail',
-      'audit',
-    ])
-    .catch('comments'),
+export const commentSearch = z.object({
   status: z
     .enum(['pending', 'approved', 'spam', 'deleted', 'all'])
     .catch('pending'),
   page: z.coerce.number().int().min(1).max(10000).catch(1),
+})
+export type CommentSearch = z.infer<typeof commentSearch>
+export const authSearch = z.object({
   auth: z.enum(['login', 'reset']).optional().catch(undefined),
 })
-export type AdminSearch = z.infer<typeof adminSearch>
+export type AuthSearch = z.infer<typeof authSearch>
 
 export const themeSchema = z.enum(['auto', 'light', 'dark'])
 const originSchema = z

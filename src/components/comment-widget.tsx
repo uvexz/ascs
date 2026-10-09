@@ -14,6 +14,8 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../lib/api'
 import { authClient } from '../lib/auth-client'
+import { resetAuthCaches } from '../lib/cache'
+import { queryKeys, staleTimes } from '../lib/query-keys'
 import {
   clearWidgetToken,
   getWidgetToken,
@@ -45,15 +47,14 @@ type WidgetOptions = {
 export function CommentWidget({ options }: { options: WidgetOptions }) {
   const queryClient = useQueryClient()
   const config = useQuery({
-    queryKey: [
-      'widget-config',
+    queryKey: queryKeys.widgetConfig(
       options.siteId,
       options.pageUrl,
       options.pageKey,
-    ],
+    ),
     queryFn: ({ signal }) =>
       api<Config>(`config?${queryString(options)}`, { signal }),
-    staleTime: 300_000,
+    staleTime: staleTimes.static,
   })
   const embedded = typeof window !== 'undefined' && window.parent !== window
   const [token, setToken] = useState<string | null>(() =>
@@ -116,9 +117,11 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
       popupRef.current?.close()
       popupRef.current = null
       setAuthOpen(false)
-      void queryClient.invalidateQueries({ queryKey: ['widget-session'] })
       void queryClient.invalidateQueries({
-        queryKey: ['comments', options.siteId],
+        queryKey: queryKeys.scope.widgetSession,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.comments(options.siteId),
       })
     }
     window.addEventListener('message', listener)
@@ -182,15 +185,13 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
     if (session.data) setAuthOpen(false)
   }, [session.data])
   const list = useQuery({
-    queryKey: [
-      'comments',
-      options.siteId,
-      options.pageUrl,
-      options.pageKey,
-      undefined,
+    queryKey: queryKeys.commentList({
+      siteId: options.siteId,
+      pageUrl: options.pageUrl,
+      pageKey: options.pageKey,
       sort,
       page,
-    ],
+    }),
     queryFn: ({ signal }) =>
       api<CommentList>(`comments?${queryString({ ...options, sort, page })}`, {
         signal,
@@ -234,7 +235,7 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
         }
       } else setPage(1)
       await queryClient.invalidateQueries({
-        queryKey: ['comments', options.siteId],
+        queryKey: queryKeys.scope.comments(options.siteId),
       })
       await config.refetch()
     },
@@ -311,17 +312,12 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
                   }
                   clearWidgetToken()
                   setToken(null)
-                  await queryClient.invalidateQueries({
-                    queryKey: ['comments', options.siteId],
-                  })
+                  resetAuthCaches(queryClient)
                   return
                 }
                 const result = await authClient.signOut()
                 if (result.error) setError(result.error.message || '退出失败')
-                else
-                  await queryClient.invalidateQueries({
-                    queryKey: ['comments', options.siteId],
-                  })
+                else resetAuthCaches(queryClient)
               }}
             >
               <SignOutIcon size={17} />
@@ -587,20 +583,21 @@ function Thread({
   const [expanded, setExpanded] = useState(false)
   const [page, setPage] = useState(1)
   const [liked, setLiked] = useState(comment.liked)
+  const [likes, setLikes] = useState(comment.likes)
   useEffect(() => setLiked(comment.liked), [comment.liked])
+  useEffect(() => setLikes(comment.likes), [comment.likes])
   useEffect(() => {
     if (expandPath.includes(comment.id)) setExpanded(true)
   }, [comment.id, expandPath])
   const replies = useQuery({
-    queryKey: [
-      'comments',
-      options.siteId,
-      options.pageUrl,
-      options.pageKey,
-      comment.id,
+    queryKey: queryKeys.commentList({
+      siteId: options.siteId,
+      pageUrl: options.pageUrl,
+      pageKey: options.pageKey,
+      parentId: comment.id,
       sort,
       page,
-    ],
+    }),
     queryFn: ({ signal }) =>
       api<CommentList>(
         `comments?${queryString({ ...options, parentId: comment.id, sort, page })}`,
@@ -614,10 +611,23 @@ function Thread({
         method: 'POST',
         body: { ...options, commentId: comment.id },
       }),
+    onMutate: () => {
+      const previous = { liked, likes }
+      const next = !liked
+      setLiked(next)
+      setLikes(Math.max(0, likes + (next ? 1 : -1)))
+      return previous
+    },
+    onError: (_error, _variables, previous) => {
+      if (previous) {
+        setLiked(previous.liked)
+        setLikes(previous.likes)
+      }
+    },
     onSuccess: async (result) => {
       setLiked(result.liked)
       await queryClient.invalidateQueries({
-        queryKey: ['comments', options.siteId],
+        queryKey: queryKeys.scope.comments(options.siteId),
       })
     },
   })
@@ -660,7 +670,7 @@ function Thread({
                   onClick={() => like.mutate()}
                 >
                   <HeartIcon size={16} weight={liked ? 'fill' : 'regular'} />
-                  {comment.likes}
+                  {likes}
                 </Button>
                 {comment.depth < 4 && (
                   <Button

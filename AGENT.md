@@ -41,10 +41,11 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 | `src/start.ts`                      | 请求中间件和安全响应头                                       |
 | `src/router.tsx`                    | 每个 router 独立的 QueryClient                               |
 | `src/routes/`                       | 页面和 API 文件路由                                          |
-| `src/components/admin-app.tsx`      | 多站点管理、审核、统计、配置、成员、封禁                     |
+| `src/routes/admin/`                 | 后台子路由：站点视图 `/admin/site/$siteId/*`、实例视图 `/admin/instance/*` |
+| `src/components/admin-shell.tsx`    | 后台外壳：侧栏导航、顶栏、创建站点和未保存设置拦截           |
 | `src/components/admin/`             | 站点后台子模块（评审、统计、集成、设置、成员、站点选择）     |
-| `src/components/instance-admin.tsx` | 实例概览、用户管理、全站管理、系统设置、邮件队列和操作日志   |
 | `src/components/instance/`          | 实例后台子模块（用户、站点、邮件、审计、系统设置）           |
+| `src/lib/queries.ts`                | 共享 queryOptions（dashboard / siteDetail / profile）         |
 | `src/server/admin.server.ts`        | 实例管理员接口、用户/站点/邮件运维与审计                     |
 | `src/server/settings.server.ts`     | 加密系统设置、脱敏读取和注册策略                             |
 | `src/components/comment-widget.tsx` | 评论表单、回复、分页、排序、点赞和嵌入状态                   |

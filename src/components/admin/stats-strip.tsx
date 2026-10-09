@@ -31,7 +31,7 @@ export function StatsStrip({ detail }: { detail: SiteDetail }) {
         <div key={stat.label}>
           <span className="text-muted">{stat.label}</span>
           <strong className={stat.className}>
-            {stat.value.toLocaleString()}
+            {stat.value.toLocaleString('zh-CN')}
           </strong>
         </div>
       ))}

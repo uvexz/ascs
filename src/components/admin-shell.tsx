@@ -1,8 +1,12 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import {
   Link,
+  Outlet,
   useBlocker,
   useNavigate,
+  useParams,
+  useRouteContext,
+  useRouterState,
   useSearch,
 } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -14,32 +18,52 @@ import {
   useSidebar,
 } from '@cloudflare/kumo'
 import {
-  ArrowRightIcon,
   CaretUpDownIcon,
   GlobeIcon,
   PlusIcon,
   SignOutIcon,
-  WarningCircleIcon,
-  ArrowClockwiseIcon,
   UserCircleIcon,
 } from '@phosphor-icons/react'
-import { api, ApiError, errorText, fieldError, queryString } from '../lib/api'
-import { invalidateSiteCaches } from '../lib/cache'
+import { api, ApiError, errorText, fieldError } from '../lib/api'
+import { resetAuthCaches } from '../lib/cache'
+import { dashboardQuery, siteDetailQuery } from '../lib/queries'
+import { queryKeys } from '../lib/query-keys'
 import { authClient } from '../lib/auth-client'
 import { AuthForm } from './auth-form'
 import { Avatar } from './avatar'
 import { AppDialog, ErrorBoundary, QueryError } from './ui'
-import { InstanceAdmin, isSystemView, systemNavigation } from './instance-admin'
-import { CommentManagement } from './admin/comment-management'
-import { Statistics } from './admin/statistics'
-import { Integration } from './admin/integration'
-import { Settings } from './admin/settings'
-import { Members } from './admin/members'
+import { navigation, systemNavigation, viewLabel } from './admin/shared'
 import { SiteSwitcher } from './admin/site-picker'
-import { navigation } from './admin/shared'
-import type { View } from './admin/shared'
-import type { Dashboard, SiteDetail } from '../server/api.server'
-import type { AdminSearch } from '../lib/validation'
+
+const siteTargets = {
+  comments: '/admin/site/$siteId/comments',
+  statistics: '/admin/site/$siteId/statistics',
+  integration: '/admin/site/$siteId/integration',
+  settings: '/admin/site/$siteId/settings',
+  members: '/admin/site/$siteId/members',
+} as const
+const systemTargets = {
+  overview: '/admin/instance/overview',
+  users: '/admin/instance/users',
+  sites: '/admin/instance/sites',
+  settings: '/admin/instance/settings',
+  mail: '/admin/instance/mail',
+  audit: '/admin/instance/audit',
+} as const
+
+export const AdminShellContext = createContext<{
+  setSettingsDirty: (dirty: boolean) => void
+  setFeedback: (message: string) => void
+  openCreate: () => void
+}>({
+  setSettingsDirty: () => {},
+  setFeedback: () => {},
+  openCreate: () => {},
+})
+
+export function useAdminShell() {
+  return useContext(AdminShellContext)
+}
 
 function NavTrigger({ className }: { className?: string }) {
   const { open, isMobile } = useSidebar()
@@ -51,30 +75,38 @@ function NavTrigger({ className }: { className?: string }) {
   )
 }
 
-export function AdminApp() {
+export function AdminShell() {
   const queryClient = useQueryClient()
-  const navigate = useNavigate({ from: '/' })
-  const search = useSearch({ from: '/' })
+  const navigate = useNavigate()
+  const search = useSearch({ from: '/admin' })
+  const { authenticated } = useRouteContext({ from: '/admin' })
+  const params = useParams({ strict: false })
+  const activeSiteId = 'siteId' in params ? params.siteId : undefined
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  })
   const [createOpen, setCreateOpen] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [settingsDirty, setSettingsDirty] = useState(false)
+  const systemView = pathname.startsWith('/admin/instance')
+  const lastSegment = pathname.split('/').filter(Boolean).at(-1)
+  const siteView = pathname.startsWith('/admin/site/')
+    ? (lastSegment as keyof typeof siteTargets | undefined)
+    : undefined
   const dashboard = useQuery({
-    queryKey: ['dashboard', search.site],
-    queryFn: ({ signal }) =>
-      api<Dashboard>(`dashboard?${queryString({ site: search.site })}`, {
-        signal,
-      }),
+    ...dashboardQuery(activeSiteId),
+    enabled: authenticated,
   })
   const current =
-    dashboard.data?.sites.find((site) => site.id === search.site) ||
+    dashboard.data?.sites.find((site) => site.id === activeSiteId) ||
     dashboard.data?.sites[0]
   const owner = current?.role === 'owner'
   const detail = useQuery({
-    queryKey: ['site', current?.id],
-    queryFn: ({ signal }) =>
-      api<SiteDetail>(`sites/${current!.id}`, { signal }),
-    enabled: !!current && !isSystemView(search.view),
+    ...siteDetailQuery(current?.id ?? ''),
+    enabled: !!current && !systemView,
   })
+  const pendingCount =
+    detail.data?.stats.find((stat) => stat.status === 'pending')?.count ?? 0
   const create = useMutation({
     mutationFn: (input: { name: string; origin: string }) =>
       api<{ id: string }>('sites', { method: 'POST', body: input }),
@@ -82,59 +114,39 @@ export function AdminApp() {
       setCreateOpen(false)
       setFeedback('站点已添加，请完成域名验证。')
       setSettingsDirty(false)
-      await queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      await queryClient.invalidateQueries({ queryKey: ['site-picker'] })
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.dashboard,
+      })
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.sitePicker,
+      })
       await navigate({
-        search: (previous) => ({
-          ...previous,
-          site: result.id,
-          view: 'integration',
-          status: 'pending',
-          page: 1,
-        }),
+        to: '/admin/site/$siteId/integration',
+        params: { siteId: result.id },
       })
     },
   })
   const blocker = useBlocker({
     shouldBlockFn: () => settingsDirty,
     withResolver: true,
-    enableBeforeUnload: true,
+    enableBeforeUnload: () => settingsDirty,
   })
 
   useEffect(() => {
-    if (!dashboard.data) return
-    if (isSystemView(search.view)) {
-      if (!dashboard.data.admin)
-        void navigate({
-          search: (previous) => ({ ...previous, view: 'comments', page: 1 }),
-        })
-      return
-    }
-    if (!current) {
-      if (search.site)
-        void navigate({
-          search: (previous) => ({
-            ...previous,
-            site: undefined,
-            view: 'comments',
-            page: 1,
-          }),
-        })
-      return
-    }
-    const allowed = owner || !['settings', 'members'].includes(search.view)
-    const patch: Partial<AdminSearch> = {}
-    if (search.site !== current.id) patch.site = current.id
-    if (!allowed) patch.view = 'comments'
-    if (Object.keys(patch).length)
-      void navigate({ search: (previous) => ({ ...previous, ...patch }) })
-  }, [current, dashboard.data, navigate, owner, search.site, search.view])
+    setFeedback('')
+  }, [pathname])
 
   useEffect(() => {
     if (dashboard.data)
       document.title = `${dashboard.data.instance.name} · 评论管理`
   }, [dashboard.data])
 
+  if (!authenticated)
+    return (
+      <main className="auth-page">
+        <AuthForm initialMode={search.auth || 'login'} />
+      </main>
+    )
   if (dashboard.isPending)
     return (
       <main className="loading-page" role="status">
@@ -153,68 +165,45 @@ export function AdminApp() {
         <QueryError error={dashboard.error} retry={dashboard.refetch} />
       </main>
     )
-  const leaveSettings = () => {
-    if (!settingsDirty || window.confirm('设置尚未保存，确定要离开吗？')) {
-      setSettingsDirty(false)
-      return true
-    }
-    return false
-  }
-  const setView = (view: View) => {
-    if (!leaveSettings()) return
-    setFeedback('')
-    void navigate({ search: (previous) => ({ ...previous, view, page: 1 }) })
-  }
-  const selectSite = (site: string) => {
-    if (!leaveSettings()) return
-    setFeedback('')
-    void navigate({
-      search: (previous) => ({
-        ...previous,
-        site,
-        status: 'pending',
-        page: 1,
-      }),
-    })
-  }
-  const startCreate = () => {
+  const openCreate = () => {
     create.reset()
     setFeedback('')
     setCreateOpen(true)
   }
-  const currentView = [...navigation, ...systemNavigation].find(
-    (item) => item.id === search.view,
-  )
-  const systemView = isSystemView(search.view)
+  const selectSite = (siteId: string) => {
+    const target = siteView && siteView in siteTargets ? siteView : 'comments'
+    setFeedback('')
+    void navigate({ to: siteTargets[target], params: { siteId } })
+  }
   const instanceName = dashboard.data.instance.name
   const roleLabel = dashboard.data.admin
     ? '实例管理员'
     : owner
       ? '站点所有者'
       : '站点成员'
-  const pendingCount =
-    detail.data?.stats.find((stat) => stat.status === 'pending')?.count ?? 0
   const signOut = async () => {
     try {
       const result = await authClient.signOut()
       if (result.error) throw new Error(result.error.message)
-      queryClient.clear()
+      resetAuthCaches(queryClient)
       window.location.assign('/')
     } catch (error) {
       setFeedback(errorText(error))
     }
   }
   return (
-    <>
+    <AdminShellContext.Provider
+      value={{ setSettingsDirty, setFeedback, openCreate }}
+    >
       <Sidebar.Provider defaultOpen className="h-dvh">
         <Sidebar>
           <Sidebar.Header className="group-data-[state=collapsed]/sidebar:justify-center h-[65px] px-3.5">
-            <a href="/" className="brand px-3">
+            <Link to="/admin" className="brand px-3">
               <img src="/brand.svg" width="26" height="26" alt="" />
               <span className="truncate group-data-[state=collapsed]/sidebar:hidden">
                 {instanceName}
               </span>
-            </a>
+            </Link>
           </Sidebar.Header>
           <Sidebar.Content>
             <Sidebar.Group>
@@ -230,7 +219,7 @@ export function AdminApp() {
                   siteLimit={
                     dashboard.data.admin ? undefined : dashboard.data.siteLimit
                   }
-                  onAdd={startCreate}
+                  onAdd={openCreate}
                 />
               </Sidebar.Menu>
             </Sidebar.Group>
@@ -246,9 +235,16 @@ export function AdminApp() {
                     <Sidebar.MenuButton
                       key={item.id}
                       icon={item.icon}
-                      active={search.view === item.id}
+                      active={!systemView && siteView === item.id}
                       tooltip={item.label}
-                      onClick={() => setView(item.id)}
+                      disabled={!current}
+                      onClick={() =>
+                        current &&
+                        void navigate({
+                          to: siteTargets[item.id],
+                          params: { siteId: current.id },
+                        })
+                      }
                     >
                       <span className="truncate">{item.label}</span>
                       {item.id === 'comments' && pendingCount > 0 && (
@@ -266,9 +262,11 @@ export function AdminApp() {
                     <Sidebar.MenuButton
                       key={item.id}
                       icon={item.icon}
-                      active={search.view === item.id}
+                      active={systemView && lastSegment === item.id}
                       tooltip={item.label}
-                      onClick={() => setView(item.id)}
+                      onClick={() =>
+                        void navigate({ to: systemTargets[item.id] })
+                      }
                     >
                       <span className="truncate">{item.label}</span>
                     </Sidebar.MenuButton>
@@ -333,7 +331,7 @@ export function AdminApp() {
               <span className="text-muted" aria-hidden="true">
                 /
               </span>
-              <span>{currentView?.label}</span>
+              <span>{viewLabel(pathname)}</span>
             </div>
             {!systemView && (
               <div className="flex gap-2 items-center">
@@ -359,147 +357,9 @@ export function AdminApp() {
                 {feedback}
               </p>
             )}
-            {systemView ? (
-              dashboard.data.admin ? (
-                <>
-                  <div className="page-heading">
-                    <div>
-                      <h1>{currentView?.label}</h1>
-                      <p className="text-muted mt-1">
-                        {instanceName} · 实例管理
-                      </p>
-                    </div>
-                    <Button
-                      shape="square"
-                      aria-label="刷新系统数据"
-                      title="刷新系统数据"
-                      disabled={settingsDirty}
-                      onClick={() => {
-                        void queryClient.invalidateQueries({
-                          queryKey: ['instance-admin'],
-                        })
-                      }}
-                    >
-                      <ArrowClockwiseIcon size={18} />
-                    </Button>
-                  </div>
-                  <ErrorBoundary key={search.view}>
-                    <InstanceAdmin
-                      view={search.view}
-                      actorId={dashboard.data.user.id}
-                      onDirtyChange={setSettingsDirty}
-                    />
-                  </ErrorBoundary>
-                </>
-              ) : (
-                <p role="alert" className="error-box">
-                  只有实例管理员可以访问系统管理。
-                </p>
-              )
-            ) : !current ? (
-              <div className="empty-state">
-                <GlobeIcon size={40} aria-hidden="true" />
-                <div className="empty-copy">
-                  <h1>暂无站点</h1>
-                  <p>
-                    {dashboard.data.canCreateSite
-                      ? '添加你的第一个博客站点'
-                      : `当前站点额度为 ${dashboard.data.siteLimit}，请联系管理员调整额度或分配站点权限`}
-                  </p>
-                </div>
-                {dashboard.data.canCreateSite && (
-                  <Button
-                    variant="primary"
-                    icon={PlusIcon}
-                    onClick={startCreate}
-                  >
-                    添加站点
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="page-heading">
-                  <div>
-                    <h1>{currentView?.label}</h1>
-                    <p className="text-muted mt-1 break-words">
-                      {current.name}
-                    </p>
-                  </div>
-                  <Button
-                    shape="square"
-                    aria-label="刷新数据"
-                    title="刷新数据"
-                    onClick={() => {
-                      void invalidateSiteCaches(queryClient, current.id)
-                    }}
-                  >
-                    <ArrowClockwiseIcon size={18} />
-                  </Button>
-                </div>
-                {detail.isPending ? (
-                  <p role="status" className="py-10 text-muted">
-                    正在加载站点数据…
-                  </p>
-                ) : detail.error ? (
-                  <QueryError error={detail.error} retry={detail.refetch} />
-                ) : (
-                  <ErrorBoundary key={`${current.id}:${search.view}`}>
-                    <>
-                      {!current.enabled && (
-                        <p role="alert" className="notice-band">
-                          此站点已被实例管理员停用，公开评论服务不可用。
-                        </p>
-                      )}
-                      {!current.verifiedAt && search.view !== 'integration' && (
-                        <div className="notice-band">
-                          <span className="h-lh flex items-center shrink-0">
-                            <WarningCircleIcon size={19} aria-hidden="true" />
-                          </span>
-                          <span>站点尚未验证，公开评论接口暂不可用。</span>
-                          <button
-                            type="button"
-                            onClick={() => setView('integration')}
-                          >
-                            验证站点
-                            <ArrowRightIcon size={15} aria-hidden="true" />
-                          </button>
-                        </div>
-                      )}
-                      {search.view === 'comments' && (
-                        <CommentManagement
-                          key={current.id}
-                          detail={detail.data}
-                          status={search.status}
-                          page={search.page}
-                          onStateChange={(patch) =>
-                            void navigate({
-                              search: (previous) => ({ ...previous, ...patch }),
-                            })
-                          }
-                        />
-                      )}
-                      {search.view === 'statistics' && (
-                        <Statistics detail={detail.data} />
-                      )}
-                      {search.view === 'integration' && (
-                        <Integration key={current.id} detail={detail.data} />
-                      )}
-                      {search.view === 'settings' && owner && (
-                        <Settings
-                          key={current.id}
-                          detail={detail.data}
-                          onDirtyChange={setSettingsDirty}
-                        />
-                      )}
-                      {search.view === 'members' && owner && (
-                        <Members key={current.id} detail={detail.data} />
-                      )}
-                    </>
-                  </ErrorBoundary>
-                )}
-              </>
-            )}
+            <ErrorBoundary key={pathname}>
+              <Outlet />
+            </ErrorBoundary>
           </main>
           <footer className="workspace-footer">
             <span>ASCS</span>
@@ -588,6 +448,6 @@ export function AdminApp() {
           </div>
         </AppDialog>
       )}
-    </>
+    </AdminShellContext.Provider>
   )
 }

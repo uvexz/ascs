@@ -4,6 +4,7 @@ import { Button, Input } from '@cloudflare/kumo'
 import { PlusIcon, TrashIcon } from '@phosphor-icons/react'
 import { api, errorText } from '../../lib/api'
 import { invalidateSiteCaches } from '../../lib/cache'
+import { LocalTime } from '../local-time'
 import type { SiteDetail } from '../../server/api.server'
 
 export function Members({ detail }: { detail: SiteDetail }) {
@@ -135,9 +136,11 @@ export function Members({ detail }: { detail: SiteDetail }) {
                     <p className="text-muted break-words">目标：{ban.target}</p>
                   )}
                 </div>
-                <time className="text-muted">
-                  {new Date(ban.createdAt).toLocaleDateString('zh-CN')}
-                </time>
+                <LocalTime
+                  value={ban.createdAt}
+                  format="date"
+                  className="text-muted"
+                />
                 <Button
                   variant="ghost"
                   disabled={change.isPending}

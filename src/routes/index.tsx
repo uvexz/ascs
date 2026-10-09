@@ -1,9 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { AdminApp } from '../components/admin-app'
-import { adminSearch } from '../lib/validation'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/')({
-  component: AdminApp,
-  ssr: false,
-  validateSearch: (input) => adminSearch.parse(input),
+  beforeLoad: () => {
+    throw redirect({ to: '/admin' })
+  },
 })

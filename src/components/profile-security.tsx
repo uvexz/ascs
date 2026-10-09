@@ -8,6 +8,7 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, fieldError } from '../lib/api'
 import { authClient } from '../lib/auth-client'
+import { queryKeys, staleTimes } from '../lib/query-keys'
 import { AppDialog, QueryError } from './ui'
 import type { ProfileAccounts } from '../server/profile.server'
 
@@ -32,11 +33,12 @@ export function ProfileSecurity({ email }: { email: string }) {
   const [newEmail, setNewEmail] = useState('')
   const [notice, setNotice] = useState('')
   const config = useQuery({
-    queryKey: ['auth-config'],
+    queryKey: queryKeys.authConfig(),
     queryFn: () => api<AuthConfig>('auth-config'),
+    staleTime: staleTimes.static,
   })
   const accounts = useQuery({
-    queryKey: ['profile', 'accounts'],
+    queryKey: queryKeys.profileAccounts(),
     queryFn: () => api<ProfileAccounts>('profile/accounts'),
   })
   const changeEmail = useMutation({
@@ -78,7 +80,7 @@ export function ProfileSecurity({ email }: { email: string }) {
       if (result.error) throw new Error(result.error.message || '解绑失败')
       setUnlinkTarget(null)
       await queryClient.invalidateQueries({
-        queryKey: ['profile', 'accounts'],
+        queryKey: queryKeys.profileAccounts(),
       })
     } catch (errorValue) {
       setUnlinkError(errorValue)

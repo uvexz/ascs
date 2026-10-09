@@ -10,18 +10,39 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as TosRouteImport } from './routes/tos'
 import { Route as WidgetRouteImport } from './routes/widget'
 import { Route as WidgetLoginRouteImport } from './routes/widget-login'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminInstanceRouteRouteImport } from './routes/admin/instance/route'
+import { Route as AdminInstanceIndexRouteImport } from './routes/admin/instance/index'
+import { Route as AdminInstanceAuditRouteImport } from './routes/admin/instance/audit'
+import { Route as AdminInstanceMailRouteImport } from './routes/admin/instance/mail'
+import { Route as AdminInstanceOverviewRouteImport } from './routes/admin/instance/overview'
+import { Route as AdminInstanceSettingsRouteImport } from './routes/admin/instance/settings'
+import { Route as AdminInstanceSitesRouteImport } from './routes/admin/instance/sites'
+import { Route as AdminInstanceUsersRouteImport } from './routes/admin/instance/users'
+import { Route as AdminSiteSiteIdRouteRouteImport } from './routes/admin/site/$siteId/route'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
+import { Route as AdminSiteSiteIdCommentsRouteImport } from './routes/admin/site/$siteId/comments'
+import { Route as AdminSiteSiteIdIntegrationRouteImport } from './routes/admin/site/$siteId/integration'
+import { Route as AdminSiteSiteIdMembersRouteImport } from './routes/admin/site/$siteId/members'
+import { Route as AdminSiteSiteIdSettingsRouteImport } from './routes/admin/site/$siteId/settings'
+import { Route as AdminSiteSiteIdStatisticsRouteImport } from './routes/admin/site/$siteId/statistics'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRouteRoute = AdminRouteRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -54,6 +75,56 @@ const WidgetLoginRoute = WidgetLoginRouteImport.update({
   path: '/widget-login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminInstanceRouteRoute = AdminInstanceRouteRouteImport.update({
+  id: '/instance',
+  path: '/instance',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
+const AdminInstanceIndexRoute = AdminInstanceIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminInstanceAuditRoute = AdminInstanceAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminInstanceMailRoute = AdminInstanceMailRouteImport.update({
+  id: '/mail',
+  path: '/mail',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminInstanceOverviewRoute = AdminInstanceOverviewRouteImport.update({
+  id: '/overview',
+  path: '/overview',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminInstanceSettingsRoute = AdminInstanceSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminInstanceSitesRoute = AdminInstanceSitesRouteImport.update({
+  id: '/sites',
+  path: '/sites',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminInstanceUsersRoute = AdminInstanceUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminInstanceRouteRoute,
+} as any)
+const AdminSiteSiteIdRouteRoute = AdminSiteSiteIdRouteRouteImport.update({
+  id: '/site/$siteId',
+  path: '/site/$siteId',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -64,17 +135,60 @@ const ApiV1SplatRoute = ApiV1SplatRouteImport.update({
   path: '/api/v1/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSiteSiteIdCommentsRoute = AdminSiteSiteIdCommentsRouteImport.update({
+  id: '/comments',
+  path: '/comments',
+  getParentRoute: () => AdminSiteSiteIdRouteRoute,
+} as any)
+const AdminSiteSiteIdIntegrationRoute =
+  AdminSiteSiteIdIntegrationRouteImport.update({
+    id: '/integration',
+    path: '/integration',
+    getParentRoute: () => AdminSiteSiteIdRouteRoute,
+  } as any)
+const AdminSiteSiteIdMembersRoute = AdminSiteSiteIdMembersRouteImport.update({
+  id: '/members',
+  path: '/members',
+  getParentRoute: () => AdminSiteSiteIdRouteRoute,
+} as any)
+const AdminSiteSiteIdSettingsRoute = AdminSiteSiteIdSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminSiteSiteIdRouteRoute,
+} as any)
+const AdminSiteSiteIdStatisticsRoute =
+  AdminSiteSiteIdStatisticsRouteImport.update({
+    id: '/statistics',
+    path: '/statistics',
+    getParentRoute: () => AdminSiteSiteIdRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/tos': typeof TosRoute
   '/widget': typeof WidgetRoute
   '/widget-login': typeof WidgetLoginRoute
+  '/admin/instance': typeof AdminInstanceRouteRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
+  '/admin/site/$siteId': typeof AdminSiteSiteIdRouteRouteWithChildren
+  '/admin/instance/audit': typeof AdminInstanceAuditRoute
+  '/admin/instance/mail': typeof AdminInstanceMailRoute
+  '/admin/instance/overview': typeof AdminInstanceOverviewRoute
+  '/admin/instance/settings': typeof AdminInstanceSettingsRoute
+  '/admin/instance/sites': typeof AdminInstanceSitesRoute
+  '/admin/instance/users': typeof AdminInstanceUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/admin/instance/': typeof AdminInstanceIndexRoute
+  '/admin/site/$siteId/comments': typeof AdminSiteSiteIdCommentsRoute
+  '/admin/site/$siteId/integration': typeof AdminSiteSiteIdIntegrationRoute
+  '/admin/site/$siteId/members': typeof AdminSiteSiteIdMembersRoute
+  '/admin/site/$siteId/settings': typeof AdminSiteSiteIdSettingsRoute
+  '/admin/site/$siteId/statistics': typeof AdminSiteSiteIdStatisticsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -84,33 +198,79 @@ export interface FileRoutesByTo {
   '/tos': typeof TosRoute
   '/widget': typeof WidgetRoute
   '/widget-login': typeof WidgetLoginRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/site/$siteId': typeof AdminSiteSiteIdRouteRouteWithChildren
+  '/admin/instance/audit': typeof AdminInstanceAuditRoute
+  '/admin/instance/mail': typeof AdminInstanceMailRoute
+  '/admin/instance/overview': typeof AdminInstanceOverviewRoute
+  '/admin/instance/settings': typeof AdminInstanceSettingsRoute
+  '/admin/instance/sites': typeof AdminInstanceSitesRoute
+  '/admin/instance/users': typeof AdminInstanceUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/admin/instance': typeof AdminInstanceIndexRoute
+  '/admin/site/$siteId/comments': typeof AdminSiteSiteIdCommentsRoute
+  '/admin/site/$siteId/integration': typeof AdminSiteSiteIdIntegrationRoute
+  '/admin/site/$siteId/members': typeof AdminSiteSiteIdMembersRoute
+  '/admin/site/$siteId/settings': typeof AdminSiteSiteIdSettingsRoute
+  '/admin/site/$siteId/statistics': typeof AdminSiteSiteIdStatisticsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/reset-password': typeof ResetPasswordRoute
   '/tos': typeof TosRoute
   '/widget': typeof WidgetRoute
   '/widget-login': typeof WidgetLoginRoute
+  '/admin/instance': typeof AdminInstanceRouteRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
+  '/admin/site/$siteId': typeof AdminSiteSiteIdRouteRouteWithChildren
+  '/admin/instance/audit': typeof AdminInstanceAuditRoute
+  '/admin/instance/mail': typeof AdminInstanceMailRoute
+  '/admin/instance/overview': typeof AdminInstanceOverviewRoute
+  '/admin/instance/settings': typeof AdminInstanceSettingsRoute
+  '/admin/instance/sites': typeof AdminInstanceSitesRoute
+  '/admin/instance/users': typeof AdminInstanceUsersRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
+  '/admin/instance/': typeof AdminInstanceIndexRoute
+  '/admin/site/$siteId/comments': typeof AdminSiteSiteIdCommentsRoute
+  '/admin/site/$siteId/integration': typeof AdminSiteSiteIdIntegrationRoute
+  '/admin/site/$siteId/members': typeof AdminSiteSiteIdMembersRoute
+  '/admin/site/$siteId/settings': typeof AdminSiteSiteIdSettingsRoute
+  '/admin/site/$siteId/statistics': typeof AdminSiteSiteIdStatisticsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/tos'
     | '/widget'
     | '/widget-login'
+    | '/admin/instance'
+    | '/admin/'
+    | '/admin/site/$siteId'
+    | '/admin/instance/audit'
+    | '/admin/instance/mail'
+    | '/admin/instance/overview'
+    | '/admin/instance/settings'
+    | '/admin/instance/sites'
+    | '/admin/instance/users'
     | '/api/auth/$'
     | '/api/v1/$'
+    | '/admin/instance/'
+    | '/admin/site/$siteId/comments'
+    | '/admin/site/$siteId/integration'
+    | '/admin/site/$siteId/members'
+    | '/admin/site/$siteId/settings'
+    | '/admin/site/$siteId/statistics'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -120,23 +280,54 @@ export interface FileRouteTypes {
     | '/tos'
     | '/widget'
     | '/widget-login'
+    | '/admin'
+    | '/admin/site/$siteId'
+    | '/admin/instance/audit'
+    | '/admin/instance/mail'
+    | '/admin/instance/overview'
+    | '/admin/instance/settings'
+    | '/admin/instance/sites'
+    | '/admin/instance/users'
     | '/api/auth/$'
     | '/api/v1/$'
+    | '/admin/instance'
+    | '/admin/site/$siteId/comments'
+    | '/admin/site/$siteId/integration'
+    | '/admin/site/$siteId/members'
+    | '/admin/site/$siteId/settings'
+    | '/admin/site/$siteId/statistics'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/privacy'
     | '/profile'
     | '/reset-password'
     | '/tos'
     | '/widget'
     | '/widget-login'
+    | '/admin/instance'
+    | '/admin/'
+    | '/admin/site/$siteId'
+    | '/admin/instance/audit'
+    | '/admin/instance/mail'
+    | '/admin/instance/overview'
+    | '/admin/instance/settings'
+    | '/admin/instance/sites'
+    | '/admin/instance/users'
     | '/api/auth/$'
     | '/api/v1/$'
+    | '/admin/instance/'
+    | '/admin/site/$siteId/comments'
+    | '/admin/site/$siteId/integration'
+    | '/admin/site/$siteId/members'
+    | '/admin/site/$siteId/settings'
+    | '/admin/site/$siteId/statistics'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRouteRoute: typeof AdminRouteRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -154,6 +345,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -198,6 +396,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WidgetLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/instance': {
+      id: '/admin/instance'
+      path: '/instance'
+      fullPath: '/admin/instance'
+      preLoaderRoute: typeof AdminInstanceRouteRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
+    '/admin/instance/': {
+      id: '/admin/instance/'
+      path: '/'
+      fullPath: '/admin/instance/'
+      preLoaderRoute: typeof AdminInstanceIndexRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/instance/audit': {
+      id: '/admin/instance/audit'
+      path: '/audit'
+      fullPath: '/admin/instance/audit'
+      preLoaderRoute: typeof AdminInstanceAuditRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/instance/mail': {
+      id: '/admin/instance/mail'
+      path: '/mail'
+      fullPath: '/admin/instance/mail'
+      preLoaderRoute: typeof AdminInstanceMailRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/instance/overview': {
+      id: '/admin/instance/overview'
+      path: '/overview'
+      fullPath: '/admin/instance/overview'
+      preLoaderRoute: typeof AdminInstanceOverviewRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/instance/settings': {
+      id: '/admin/instance/settings'
+      path: '/settings'
+      fullPath: '/admin/instance/settings'
+      preLoaderRoute: typeof AdminInstanceSettingsRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/instance/sites': {
+      id: '/admin/instance/sites'
+      path: '/sites'
+      fullPath: '/admin/instance/sites'
+      preLoaderRoute: typeof AdminInstanceSitesRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/instance/users': {
+      id: '/admin/instance/users'
+      path: '/users'
+      fullPath: '/admin/instance/users'
+      preLoaderRoute: typeof AdminInstanceUsersRouteImport
+      parentRoute: typeof AdminInstanceRouteRoute
+    }
+    '/admin/site/$siteId': {
+      id: '/admin/site/$siteId'
+      path: '/site/$siteId'
+      fullPath: '/admin/site/$siteId'
+      preLoaderRoute: typeof AdminSiteSiteIdRouteRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -212,11 +480,105 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiV1SplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/site/$siteId/comments': {
+      id: '/admin/site/$siteId/comments'
+      path: '/comments'
+      fullPath: '/admin/site/$siteId/comments'
+      preLoaderRoute: typeof AdminSiteSiteIdCommentsRouteImport
+      parentRoute: typeof AdminSiteSiteIdRouteRoute
+    }
+    '/admin/site/$siteId/integration': {
+      id: '/admin/site/$siteId/integration'
+      path: '/integration'
+      fullPath: '/admin/site/$siteId/integration'
+      preLoaderRoute: typeof AdminSiteSiteIdIntegrationRouteImport
+      parentRoute: typeof AdminSiteSiteIdRouteRoute
+    }
+    '/admin/site/$siteId/members': {
+      id: '/admin/site/$siteId/members'
+      path: '/members'
+      fullPath: '/admin/site/$siteId/members'
+      preLoaderRoute: typeof AdminSiteSiteIdMembersRouteImport
+      parentRoute: typeof AdminSiteSiteIdRouteRoute
+    }
+    '/admin/site/$siteId/settings': {
+      id: '/admin/site/$siteId/settings'
+      path: '/settings'
+      fullPath: '/admin/site/$siteId/settings'
+      preLoaderRoute: typeof AdminSiteSiteIdSettingsRouteImport
+      parentRoute: typeof AdminSiteSiteIdRouteRoute
+    }
+    '/admin/site/$siteId/statistics': {
+      id: '/admin/site/$siteId/statistics'
+      path: '/statistics'
+      fullPath: '/admin/site/$siteId/statistics'
+      preLoaderRoute: typeof AdminSiteSiteIdStatisticsRouteImport
+      parentRoute: typeof AdminSiteSiteIdRouteRoute
+    }
   }
 }
 
+interface AdminInstanceRouteRouteChildren {
+  AdminInstanceAuditRoute: typeof AdminInstanceAuditRoute
+  AdminInstanceMailRoute: typeof AdminInstanceMailRoute
+  AdminInstanceOverviewRoute: typeof AdminInstanceOverviewRoute
+  AdminInstanceSettingsRoute: typeof AdminInstanceSettingsRoute
+  AdminInstanceSitesRoute: typeof AdminInstanceSitesRoute
+  AdminInstanceUsersRoute: typeof AdminInstanceUsersRoute
+  AdminInstanceIndexRoute: typeof AdminInstanceIndexRoute
+}
+
+const AdminInstanceRouteRouteChildren: AdminInstanceRouteRouteChildren = {
+  AdminInstanceAuditRoute: AdminInstanceAuditRoute,
+  AdminInstanceMailRoute: AdminInstanceMailRoute,
+  AdminInstanceOverviewRoute: AdminInstanceOverviewRoute,
+  AdminInstanceSettingsRoute: AdminInstanceSettingsRoute,
+  AdminInstanceSitesRoute: AdminInstanceSitesRoute,
+  AdminInstanceUsersRoute: AdminInstanceUsersRoute,
+  AdminInstanceIndexRoute: AdminInstanceIndexRoute,
+}
+
+const AdminInstanceRouteRouteWithChildren =
+  AdminInstanceRouteRoute._addFileChildren(AdminInstanceRouteRouteChildren)
+
+interface AdminSiteSiteIdRouteRouteChildren {
+  AdminSiteSiteIdCommentsRoute: typeof AdminSiteSiteIdCommentsRoute
+  AdminSiteSiteIdIntegrationRoute: typeof AdminSiteSiteIdIntegrationRoute
+  AdminSiteSiteIdMembersRoute: typeof AdminSiteSiteIdMembersRoute
+  AdminSiteSiteIdSettingsRoute: typeof AdminSiteSiteIdSettingsRoute
+  AdminSiteSiteIdStatisticsRoute: typeof AdminSiteSiteIdStatisticsRoute
+}
+
+const AdminSiteSiteIdRouteRouteChildren: AdminSiteSiteIdRouteRouteChildren = {
+  AdminSiteSiteIdCommentsRoute: AdminSiteSiteIdCommentsRoute,
+  AdminSiteSiteIdIntegrationRoute: AdminSiteSiteIdIntegrationRoute,
+  AdminSiteSiteIdMembersRoute: AdminSiteSiteIdMembersRoute,
+  AdminSiteSiteIdSettingsRoute: AdminSiteSiteIdSettingsRoute,
+  AdminSiteSiteIdStatisticsRoute: AdminSiteSiteIdStatisticsRoute,
+}
+
+const AdminSiteSiteIdRouteRouteWithChildren =
+  AdminSiteSiteIdRouteRoute._addFileChildren(AdminSiteSiteIdRouteRouteChildren)
+
+interface AdminRouteRouteChildren {
+  AdminInstanceRouteRoute: typeof AdminInstanceRouteRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminSiteSiteIdRouteRoute: typeof AdminSiteSiteIdRouteRouteWithChildren
+}
+
+const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminInstanceRouteRoute: AdminInstanceRouteRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminSiteSiteIdRouteRoute: AdminSiteSiteIdRouteRouteWithChildren,
+}
+
+const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
+  AdminRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRouteRoute: AdminRouteRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ResetPasswordRoute: ResetPasswordRoute,

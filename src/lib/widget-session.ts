@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ApiError, api } from './api'
+import { queryKeys } from './query-keys'
 
 const STORAGE_KEY = 'ascs.widget.session'
 let currentToken: string | null =
@@ -37,7 +38,7 @@ export type WidgetUser = { id: string; name: string; image: string | null }
 
 export function useWidgetSession(token: string | null) {
   const query = useQuery({
-    queryKey: ['widget-session', token],
+    queryKey: queryKeys.widgetSession(token),
     enabled: !!token,
     retry: false,
     queryFn: async (): Promise<{ user: WidgetUser } | null> => {

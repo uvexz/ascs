@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { api, errorText } from '../../lib/api'
+import { queryKeys, staleTimes } from '../../lib/query-keys'
 import { QueryError } from '../ui'
 import type { SafeSystemSettings } from '../../lib/system-settings'
 
@@ -14,9 +15,10 @@ export function SystemSettings({
   const [dirty, setDirty] = useState(false)
   const [snapshot, setSnapshot] = useState<SafeSystemSettings | null>(null)
   const query = useQuery({
-    queryKey: ['instance-admin', 'settings'],
+    queryKey: queryKeys.instance.settings(),
     queryFn: ({ signal }) =>
       api<SafeSystemSettings>('admin/settings', { signal }),
+    staleTime: staleTimes.static,
   })
   const [notice, setNotice] = useState('')
   useEffect(() => {
@@ -33,12 +35,11 @@ export function SystemSettings({
       setDirty(false)
       setSnapshot(null)
       setNotice('系统设置已保存并生效。')
-      client.setQueryData(['instance-admin', 'settings'], value)
+      client.setQueryData(queryKeys.instance.settings(), value)
       await Promise.all([
-        client.invalidateQueries({ queryKey: ['dashboard'] }),
-        client.invalidateQueries({ queryKey: ['auth-config'] }),
-        client.invalidateQueries({ queryKey: ['instance-config'] }),
-        client.invalidateQueries({ queryKey: ['instance-admin', 'audit'] }),
+        client.invalidateQueries({ queryKey: queryKeys.scope.dashboard }),
+        client.invalidateQueries({ queryKey: queryKeys.authConfig() }),
+        client.invalidateQueries({ queryKey: queryKeys.instance.audit() }),
       ])
     },
   })
@@ -47,7 +48,7 @@ export function SystemSettings({
       api('admin/settings/smtp-test', { method: 'POST', body: { to } }),
     onSuccess: async () => {
       setNotice('测试邮件已发送，请检查收件箱。')
-      await client.invalidateQueries({ queryKey: ['instance-admin', 'audit'] })
+      await client.invalidateQueries({ queryKey: queryKeys.instance.audit() })
     },
   })
   const [testTo, setTestTo] = useState('')

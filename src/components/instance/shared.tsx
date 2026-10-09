@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, queryString } from '../../lib/api'
 import { invalidateInstanceCaches } from '../../lib/cache'
+import { queryKeys } from '../../lib/query-keys'
 import { Pagination } from '../pagination'
 
 export function useList<T>(resource: string) {
@@ -9,7 +10,7 @@ export function useList<T>(resource: string) {
   const [status, setFilter] = useState('all')
   const [page, setPage] = useState(1)
   const query = useQuery({
-    queryKey: ['instance-admin', resource, q, status, page],
+    queryKey: queryKeys.instance.list(resource, q, status, page),
     queryFn: ({ signal }) =>
       api<T>(`admin/${resource}?${queryString({ q, status, page })}`, {
         signal,

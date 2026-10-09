@@ -6,16 +6,15 @@ import { errorText } from '../lib/api'
 
 export const Route = createFileRoute('/reset-password')({
   component: ResetPassword,
-  ssr: false,
+  validateSearch: (search: Record<string, unknown>): { token?: string } => ({
+    token: typeof search.token === 'string' ? search.token : undefined,
+  }),
 })
 function ResetPassword() {
   const [error, setError] = useState('')
   const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
-  const token =
-    typeof window === 'undefined'
-      ? null
-      : new URLSearchParams(window.location.search).get('token')
+  const { token } = Route.useSearch()
   return (
     <main className="auth-page">
       <div className="auth-panel">
@@ -32,7 +31,7 @@ function ResetPassword() {
             <p role="alert" className="error-box">
               此重置链接无效或已过期。
             </p>
-            <a className="text-link" href="/?auth=reset">
+            <a className="text-link" href="/admin?auth=reset">
               重新申请重置链接
             </a>
           </div>

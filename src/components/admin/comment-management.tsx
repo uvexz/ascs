@@ -10,14 +10,16 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../../lib/api'
 import { invalidateSiteCaches } from '../../lib/cache'
+import { queryKeys } from '../../lib/query-keys'
 import { Avatar } from '../avatar'
+import { LocalTime } from '../local-time'
 import { AppDialog, QueryError } from '../ui'
 import { Markdown } from '../markdown'
 import { Pagination } from '../pagination'
 import { StatsStrip } from './stats-strip'
 import { statusLabels } from './shared'
 import type { AdminComments, SiteDetail } from '../../server/api.server'
-import type { AdminSearch } from '../../lib/validation'
+import type { CommentSearch } from '../../lib/validation'
 import type { Status } from './shared'
 
 export function CommentManagement({
@@ -29,7 +31,7 @@ export function CommentManagement({
   detail: SiteDetail
   status: Status
   page: number
-  onStateChange: (patch: Partial<AdminSearch>) => void
+  onStateChange: (patch: Partial<CommentSearch>) => void
 }) {
   const queryClient = useQueryClient()
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -37,8 +39,9 @@ export function CommentManagement({
     AdminComments['items'][number] | null
   >(null)
   const [notice, setNotice] = useState('')
+  const listKey = queryKeys.adminComments(detail.site.id, status, page)
   const list = useQuery({
-    queryKey: ['admin-comments', detail.site.id, status, page],
+    queryKey: listKey,
     queryFn: ({ signal }) =>
       api<AdminComments>(
         `sites/${detail.site.id}/comments?${queryString({ status, page })}`,
@@ -58,6 +61,28 @@ export function CommentManagement({
       status: 'approved' | 'spam' | 'deleted'
     }) =>
       api(`sites/${detail.site.id}/comments`, { method: 'POST', body: input }),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: listKey })
+      const previous = queryClient.getQueryData<AdminComments>(listKey)
+      if (previous) {
+        queryClient.setQueryData<AdminComments>(listKey, {
+          ...previous,
+          items:
+            status === 'all'
+              ? previous.items.map((item) =>
+                  item.id === input.commentId
+                    ? { ...item, status: input.status }
+                    : item,
+                )
+              : previous.items.filter((item) => item.id !== input.commentId),
+        })
+      }
+      return { previous }
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous)
+        queryClient.setQueryData<AdminComments>(listKey, context.previous)
+    },
     onSuccess: async (_, input) => {
       setDeleteId(null)
       setNotice(
@@ -153,9 +178,7 @@ export function CommentManagement({
                   <span className={`badge ${comment.status}`}>
                     {statusLabels[comment.status]}
                   </span>
-                  <time>
-                    {new Date(comment.createdAt).toLocaleString('zh-CN')}
-                  </time>
+                  <LocalTime value={comment.createdAt} />
                 </div>
                 <a
                   className="article-link"

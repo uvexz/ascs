@@ -1,3 +1,4 @@
+import { LocalTime } from '../local-time'
 import { QueryError } from '../ui'
 import { ListPagination, useList } from './shared'
 import type { InstanceAudit } from '../../server/admin.server'
@@ -43,9 +44,7 @@ export function Audit() {
                   <p className="text-muted break-all">{item.action}</p>
                 )}
               </div>
-              <time className="text-muted">
-                {new Date(item.createdAt).toLocaleString('zh-CN')}
-              </time>
+              <LocalTime value={item.createdAt} className="text-muted" />
             </div>
           ))}
           {!list.query.data.items.length && (

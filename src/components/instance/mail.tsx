@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Button } from '@cloudflare/kumo'
 import { api, errorText } from '../../lib/api'
+import { LocalTime } from '../local-time'
 import { QueryError } from '../ui'
 import { Filters } from './filters'
 import { ListPagination, useAdminRefresh, useList } from './shared'
@@ -76,9 +77,8 @@ export function Mail() {
                   <p className="text-muted break-all">{mail.to}</p>
                   <p className="text-muted">
                     尝试 {mail.attempts} 次 ·{' '}
-                    {mail.sentAt
-                      ? `发送于 ${new Date(mail.sentAt).toLocaleString('zh-CN')}`
-                      : `计划 ${new Date(mail.availableAt).toLocaleString('zh-CN')}`}
+                    {mail.sentAt ? '发送于 ' : '计划 '}
+                    <LocalTime value={mail.sentAt ?? mail.availableAt} />
                   </p>
                   {mail.lastError && (
                     <p className="text-muted">SMTP 发送失败</p>

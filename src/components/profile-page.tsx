@@ -5,6 +5,8 @@ import { Button, Input } from '@cloudflare/kumo'
 import { ArrowLeftIcon } from '@phosphor-icons/react'
 import { api, ApiError, errorText, fieldError } from '../lib/api'
 import { authClient } from '../lib/auth-client'
+import { profileQuery } from '../lib/queries'
+import { queryKeys } from '../lib/query-keys'
 import { profileInput } from '../lib/validation'
 import { AuthForm } from './auth-form'
 import { Avatar } from './avatar'
@@ -20,34 +22,27 @@ const emailChangeMessages: Record<string, string> = {
   unavailable: '当前账号不支持修改邮箱。',
 }
 
-export function ProfilePage() {
+export function ProfilePage({
+  authenticated,
+  initialUserId,
+}: {
+  authenticated: boolean
+  initialUserId?: string
+}) {
   const session = authClient.useSession()
   const search = useSearch({ from: '/profile' })
   const emailNotice = search.emailChange
     ? emailChangeMessages[search.emailChange]
     : undefined
-  const [userId, setUserId] = useState<string>()
+  const [userId, setUserId] = useState(initialUserId)
   useEffect(() => {
     if (session.data) setUserId(session.data.user.id)
   }, [session.data])
   const profile = useQuery({
-    queryKey: ['profile', session.data?.user.id || userId],
-    queryFn: ({ signal }) => api<Profile>('profile', { signal }),
-    enabled: !session.isPending && !!session.data,
+    ...profileQuery(session.data?.user.id || userId),
+    enabled: authenticated,
   })
-  if (session.isPending)
-    return (
-      <main className="loading-page" role="status">
-        正在检查登录状态…
-      </main>
-    )
-  if (session.error && !profile.data)
-    return (
-      <main className="auth-page">
-        <QueryError error={session.error} retry={session.refetch} />
-      </main>
-    )
-  if (!session.data && !profile.data)
+  if (!authenticated && !profile.data)
     return (
       <main className="auth-page">
         <AuthForm />
@@ -56,11 +51,7 @@ export function ProfilePage() {
   return (
     <div className="min-h-dvh">
       <header className="topbar">
-        <Link
-          to="/"
-          search={{ view: 'comments', status: 'pending', page: 1 }}
-          className="text-link inline-flex items-start gap-2"
-        >
+        <Link to="/admin" className="text-link inline-flex items-start gap-2">
           <span className="h-lh flex items-center shrink-0">
             <ArrowLeftIcon size={16} aria-hidden="true" />
           </span>
@@ -152,15 +143,19 @@ function ProfileForm({
       setSaved(next)
       setDraft(next)
       setNotice('个人资料已保存。')
-      queryClient.setQueryData(['profile', profile.id], updated)
+      queryClient.setQueryData(queryKeys.profile(profile.id), updated)
       void refreshSession()
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] }),
-        queryClient.invalidateQueries({ queryKey: ['comments'] }),
-        queryClient.invalidateQueries({ queryKey: ['admin-comments'] }),
-        queryClient.invalidateQueries({ queryKey: ['site'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope.dashboard }),
         queryClient.invalidateQueries({
-          queryKey: ['instance-admin', 'users'],
+          queryKey: queryKeys.scope.commentsAll,
+        }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.scope.adminComments(),
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope.siteDetail }),
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.scope.instanceResource('users'),
         }),
       ])
     },

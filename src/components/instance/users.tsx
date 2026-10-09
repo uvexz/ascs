@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { api, errorText } from '../../lib/api'
+import { LocalTime } from '../local-time'
 import { AppDialog, QueryError } from '../ui'
 import { Filters } from './filters'
 import { ListPagination, useAdminRefresh, useList } from './shared'
@@ -106,9 +107,8 @@ export function Users({ actorId }: { actorId: string }) {
                   </p>
                   <p className="text-muted break-all">{person.email}</p>
                   <p className="text-muted">
-                    注册于{' '}
-                    {new Date(person.createdAt).toLocaleDateString('zh-CN')} ·
-                    邮箱{person.emailVerified ? '已验证' : '未验证'}
+                    注册于 <LocalTime value={person.createdAt} format="date" />{' '}
+                    · 邮箱{person.emailVerified ? '已验证' : '未验证'}
                   </p>
                 </div>
                 <span
