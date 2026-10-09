@@ -39,7 +39,7 @@ export const baseOrigin = () =>
   new URL(process.env.BETTER_AUTH_URL || 'http://localhost:3000').origin
 
 const EMAIL_CHANGE_TTL = 60 * 60 * 1000
-export type EmailChangeToken = {
+type EmailChangeToken = {
   userId: string
   newEmail: string
   fromEmail: string

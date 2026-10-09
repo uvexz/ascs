@@ -36,7 +36,6 @@ export const profileInput = z
 export type ProfileInput = z.infer<typeof profileInput>
 
 export const emailChangeInput = z.object({ email: z.email().max(254) }).strict()
-export type EmailChangeInput = z.infer<typeof emailChangeInput>
 
 export const id = z.string().uuid()
 export const adminSearch = z.object({
@@ -65,7 +64,7 @@ export const adminSearch = z.object({
 export type AdminSearch = z.infer<typeof adminSearch>
 
 export const themeSchema = z.enum(['auto', 'light', 'dark'])
-export const originSchema = z
+const originSchema = z
   .string()
   .url()
   .max(300)

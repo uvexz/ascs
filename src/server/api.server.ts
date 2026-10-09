@@ -54,7 +54,7 @@ import {
   updateProfile,
 } from './profile.server'
 
-export async function publicContext(input: z.infer<typeof pageInput>) {
+async function publicContext(input: z.infer<typeof pageInput>) {
   const site = await db
     .select()
     .from(sites)
@@ -81,7 +81,7 @@ const counts = (siteId: string) =>
     .where(eq(comments.siteId, siteId))
     .groupBy(comments.status)
 
-export async function listComments(request: Request) {
+async function listComments(request: Request) {
   const input = listInput.parse(params(request))
   const { site, pageKey } = await publicContext(input)
   if (input.parentId) {
@@ -373,7 +373,7 @@ async function toggleLike(request: Request) {
   )
 }
 
-export async function dashboard(request: Request) {
+async function dashboard(request: Request) {
   const session = await requireSession(request)
   const admin = await isAdmin(session.user.id)
   const selected = new URL(request.url).searchParams.get('site')
@@ -429,7 +429,7 @@ export async function dashboard(request: Request) {
 }
 export type Dashboard = Awaited<ReturnType<typeof dashboard>>
 
-export async function listSites(request: Request) {
+async function listSites(request: Request) {
   const session = await requireSession(request)
   const admin = await isAdmin(session.user.id)
   const input = z
@@ -500,7 +500,7 @@ export async function listSites(request: Request) {
 }
 export type SiteList = Awaited<ReturnType<typeof listSites>>
 
-export async function adminComments(request: Request, siteId: string) {
+async function adminComments(request: Request, siteId: string) {
   await authorize(request, siteId)
   const input = z
     .object({

@@ -18,7 +18,7 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 - Nodemailer：SMTP；数据库 outbox 负责持久化、重试和任务租约。
 - Nitro：Node server 和 PaaS 部署适配。
 
-依赖的实际版本应从 lockfile 或安装后的包核实，不要只根据 `package.json` 的版本范围推断 API。仓库同时存在 `package-lock.json` 和 `bun.lock`；Docker 使用 `bun ci`，依赖变更必须至少保持 bun lockfile 一致，不能假定两个 lockfile 已同步。
+依赖的实际版本应从 lockfile 或安装后的包核实，不要只根据 `package.json` 的版本范围推断 API。仓库同时存在 `package-lock.json` 和 `bun.lock`，两者都要保持同步；Docker 与 Vercel 使用 `npm ci` / `npm run build`（基于 `package-lock.json`），本地开发可用 bun。依赖变更后必须同时更新两个 lockfile。
 
 ## 模块地图
 
@@ -30,18 +30,25 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 | `src/lib/auth-client.ts`            | 浏览器认证客户端                                             |
 | `src/lib/validation.ts`             | Zod 输入校验、共享枚举和分页常量                             |
 | `src/lib/api.ts`                    | 浏览器 fetch、错误类型、查询参数编码                         |
+| `src/lib/cache.ts`                  | TanStack Query 缓存失效 helper                               |
+| `src/lib/system-settings.ts`        | 系统设置的类型、默认值和 Zod schema                          |
 | `src/server/security.server.ts`     | session、站点授权、来源检查、HMAC、原子限流、challenge       |
+| `src/server/http.server.ts`         | 请求体读取、查询参数解析和 JSON 响应 helper                  |
 | `src/server/api.server.ts`          | `/api/v1/*` 分发及评论、站点管理业务                         |
+| `src/server/profile.server.ts`      | 个人资料、账户绑定和邮箱变更服务                             |
 | `src/server/mail.server.ts`         | 持久化邮件 outbox 和 SMTP worker                             |
 | `src/start.ts`                      | 请求中间件和安全响应头                                       |
 | `src/router.tsx`                    | 每个 router 独立的 QueryClient                               |
 | `src/routes/`                       | 页面和 API 文件路由                                          |
 | `src/components/admin-app.tsx`      | 多站点管理、审核、统计、配置、成员、封禁                     |
+| `src/components/admin/`             | 站点后台子模块（评审、统计、集成、设置、成员、站点选择）     |
 | `src/components/instance-admin.tsx` | 实例概览、用户管理、全站管理、系统设置、邮件队列和操作日志   |
+| `src/components/instance/`          | 实例后台子模块（用户、站点、邮件、审计、系统设置）           |
 | `src/server/admin.server.ts`        | 实例管理员接口、用户/站点/邮件运维与审计                     |
 | `src/server/settings.server.ts`     | 加密系统设置、脱敏读取和注册策略                             |
 | `src/components/comment-widget.tsx` | 评论表单、回复、分页、排序、点赞和嵌入状态                   |
 | `src/components/markdown.tsx`       | 统一安全 Markdown 渲染                                       |
+| `src/components/`                   | 认证、个人资料和公共 UI 组件                                 |
 | `src/styles.css`                    | Tailwind/Kumo 导入、应用样式和响应式布局                     |
 | `public/embed.js`                   | 无依赖 iframe 嵌入脚本和高度消息校验                         |
 | `scripts/`                          | 环境初始化、数据库迁移、管理员初始化、邮件发送               |
@@ -156,14 +163,12 @@ bun run start
 以下是生成本文件时的最近验证记录，不代表未来修改后的状态：
 
 - 当前仓库已移除自动化测试代码、测试配置及对应依赖；不要使用已删除的测试命令。业务与安全流程需人工验收。
-- TypeScript 检查和 Node 生产构建曾通过；后续修改仍需重新运行相关检查。
-- 构建有 Kumo 依赖的 `use client` 指令告警，不应隐藏其他构建错误。
-- ESLint 尚未通过，存在导入空行、变量遮蔽、类型导入及 `no-unnecessary-condition` 等问题。修复时注意 Drizzle 数组查询可能实际为空，不可仅为满足静态规则删除必需的权限和存在性检查。
+- `bun run typecheck`、`bun run lint` 和 `bun run build` 均通过；后续修改仍需重新运行相关检查。
+- 构建带 Kumo 依赖的既有 `use client` 指令告警，不应隐藏其他构建错误。
 - 尚未完成截图和真实 UI 验证，不能声称 UI 或 E2E 验收已通过。
 - Docker 实际构建运行、Vercel 远程部署、真实 DNS 验证、Turso 远程连接、SMTP 实际送达和真实 OAuth provider 登录尚未完成验收。
-- `README.md` 中 Docker 初始化顺序及“先初始化宿主机管理员再启动 volume”的示例需要与实际容器数据库核对并修正。
 - 初始 Vercel 配置需要验证 Nitro preset 产物和 cron 授权行为。
-- 邮件失败运维、实例管理员管理 UI、系统设置和实例操作日志已实现；验收清单在 `docs/admin-acceptance.md`。跨站 OAuth/第三方 cookie 兼容性、完整 CSP、真实 SMTP 外部连接和 UI 浏览器验收仍需验证。
+- 邮件失败运维、实例管理员管理 UI、系统设置和实例操作日志已实现。跨站 OAuth/第三方 cookie 兼容性、完整 CSP、真实 SMTP 外部连接和 UI 浏览器验收仍需验证。
 
 接续时先解决会影响安全、真实业务和部署的缺口，再进行外观调整；验证报告明确区分通过、失败、未执行和受环境阻塞的项目。
 
@@ -171,70 +176,3 @@ bun run start
 
 - 禁止 UI 单元测试，列出本次改动受影响的 UI 并给出测试 Todo list，我自行验证。
 - 不要主动 e2e 测试。
-
----
-
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
-
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
-
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.

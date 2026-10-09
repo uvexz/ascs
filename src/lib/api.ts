@@ -1,4 +1,4 @@
-export type FieldIssue = { path: Array<string | number>; message: string }
+type FieldIssue = { path: Array<string | number>; message: string }
 
 export class ApiError extends Error {
   constructor(

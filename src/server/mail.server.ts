@@ -5,7 +5,7 @@ import { db } from '../db'
 import { mailQueue, rateLimits } from '../db/schema'
 import { readSettings } from './settings.server'
 
-export async function mailTransport() {
+async function mailTransport() {
   const { settings, saved } = await readSettings()
   if (!saved && process.env.SMTP_URL && process.env.MAIL_FROM)
     return {

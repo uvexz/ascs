@@ -4,7 +4,7 @@ ASCS（A Simple Comment System）是一个面向多站点博客的评论服务�
 
 默认头像使用 Blobatar，按姓名生成，固定 `shape: 0.11` 并支持鼠标悬停动画。用户可在个人设置中填写自定义头像图片地址。
 
-登录后可通过后台侧栏的“个人设置”或评论区自己的昵称进入 `/profile`，修改昵称、头像、个人网站和简介。无站点权限的账号同样可以使用。头像与网站支持不含内嵌凭据的 HTTP(S) 地址，留空可清除；昵称最多 60 字符，简介最多 500 字符。评论显示账号当前的昵称和头像，昵称可链接到个人网站；简介保存在个人资料中，邮箱仅在本人设置页展示。手工验收清单见 [docs/profile-acceptance.md](docs/profile-acceptance.md)。
+登录后可通过后台侧栏的“个人设置”或评论区自己的昵称进入 `/profile`，修改昵称、头像、个人网站和简介。无站点权限的账号同样可以使用。头像与网站支持不含内嵌凭据的 HTTP(S) 地址，留空可清除；昵称最多 60 字符，简介最多 500 字符。评论显示账号当前的昵称和头像，昵称可链接到个人网站；简介保存在个人资料中，邮箱仅在本人设置页展示。
 
 ## 技术结构
 
@@ -52,7 +52,7 @@ bun run dev
 
 尚未保存后台设置时，邮件继续使用 `SMTP_URL` 和 `MAIL_FROM` 环境变量；首次保存系统设置后，SMTP 使用后台配置，需一并填好 SMTP 信息或明确关闭。连接测试使用已保存的配置，会实际发送 SMTP 测试邮件。
 
-邮件仍由持久化 outbox 和定时任务发送，每批最多 20 封，最多尝试 5 次。后台手动发送不替代持续运行的定时任务。UI 手工验收清单见 [docs/admin-acceptance.md](docs/admin-acceptance.md)。
+邮件仍由持久化 outbox 和定时任务发送，每批最多 20 封，最多尝试 5 次。后台手动发送不替代持续运行的定时任务。
 
 ## 嵌入博客
 
@@ -81,9 +81,11 @@ bun run dev
 - `DATABASE_AUTH_TOKEN`：Turso token
 - `BETTER_AUTH_URL`、`BETTER_AUTH_SECRET`：认证回调地址和至少 32 字符密钥
 - `TRUSTED_IP_HEADER`：只有反向代理会覆盖此 header 时才设置，用于限流和封禁 IP
+- `ALLOW_LOCALHOST_SITE`：仅开发环境，允许创建 localhost 站点并跳过 DNS 验证
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`：可选 OAuth（`MICROSOFT_TENANT_ID` 可选，默认 `common`）
 - `SMTP_URL`、`MAIL_FROM`：可选 SMTP；站点邮件写入 outbox，由 cron 或 VPS 定时任务发送
 - `CRON_SECRET`：至少 32 字符，用于 `/api/v1/cron/mail`
+- `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`：仅 `admin:init` 使用的一次性管理员初始化变量
 
 认证 cookie 使用 HttpOnly、SameSite=Lax；生产环境从 HTTPS URL 自动使用安全 cookie。Better Auth 的表和 ASCS 业务表由同一次 Drizzle 迁移创建。
 
@@ -93,15 +95,14 @@ bun run dev
 
 ```bash
 cp .env.example .env
-# 设置生产 BETTER_AUTH_URL、BETTER_AUTH_SECRET、CRON_SECRET、DATABASE_URL
-bun install
-bun run db:generate
-# 生产迁移在容器启动命令中自动执行
-ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD='至少10位的密码' bun run admin:init
+# 设置生产 BETTER_AUTH_URL、BETTER_AUTH_SECRET、CRON_SECRET
+# 以及一次性初始化用的 ADMIN_EMAIL、ADMIN_PASSWORD（可选 ADMIN_NAME）
 docker compose up -d --build
+# 迁移在容器启动时自动执行；管理员必须在容器内的数据库中初始化
+docker compose exec ascs npm run admin:init
 ```
 
-`compose.yaml` 将 SQLite 数据写入 `ascs-data` volume，容器以非 root 用户运行，并带健康检查。生产 VPS 应在 Nginx/Caddy 后使用 HTTPS；如果配置 IP header，必须让代理覆盖 header 并阻止外部直连容器端口。SMTP outbox 可用 cron 每分钟调用：
+`compose.yaml` 将 `DATABASE_URL` 固定为 `file:/app/data/ascs.db` 并挂载到 `ascs-data` volume。初始化完成后从 `.env` 移除 `ADMIN_PASSWORD` 并重启容器。`compose.yaml` 让容器以非 root 用户运行，并带健康检查。生产 VPS 应在 Nginx/Caddy 后使用 HTTPS；如果配置 IP header，必须让代理覆盖 header 并阻止外部直连容器端口。SMTP outbox 可用 cron 每分钟调用：
 
 ```cron
 * * * * * curl -fsS -H 'Authorization: Bearer <CRON_SECRET>' https://comments.example.com/api/v1/cron/mail >/dev/null

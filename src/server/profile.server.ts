@@ -56,7 +56,7 @@ export async function updateProfile(request: Request) {
   return updated
 }
 
-export type ProfileAccount = { id: string; providerId: string }
+type ProfileAccount = { id: string; providerId: string }
 
 async function listAccounts(userId: string): Promise<ProfileAccount[]> {
   return await db

@@ -28,7 +28,7 @@ type Config = {
   theme: 'auto' | 'light' | 'dark'
   challenge: string
 }
-export type WidgetOptions = {
+type WidgetOptions = {
   siteId: string
   pageUrl: string
   pageKey?: string
@@ -78,8 +78,7 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
   useEffect(() => {
     replyRef.current = reply
   }, [reply])
-  const embedded =
-    typeof window !== 'undefined' && window.parent !== window
+  const embedded = typeof window !== 'undefined' && window.parent !== window
   function openLogin() {
     setAuthOpen(true)
   }
