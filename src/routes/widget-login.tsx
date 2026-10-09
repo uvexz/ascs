@@ -32,6 +32,7 @@ function WidgetLogin() {
     try {
       const result = await api<{ token: string }>('widget/session', {
         method: 'POST',
+        body: {},
         skipAuth: true,
       })
       let sameOrigin = false

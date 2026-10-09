@@ -305,7 +305,7 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
               onClick={async () => {
                 if (embedded) {
                   try {
-                    await api('widget/session', { method: 'DELETE' })
+                    await api('widget/session', { method: 'DELETE', body: {} })
                   } catch {
                     setError('退出请求未送达，已在本地退出。')
                   }
