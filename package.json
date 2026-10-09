@@ -1,0 +1,75 @@
+{
+  "name": "ascs",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "generate-routes": "tsr generate",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint src scripts *.config.ts",
+    "format": "prettier --write . && eslint --fix",
+    "check": "prettier --check .",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "setup": "tsx scripts/setup.ts",
+    "admin:init": "tsx scripts/admin.ts",
+    "mail:flush": "tsx scripts/mail.ts",
+    "typecheck": "tsc --noEmit",
+    "start": "node .output/server/index.mjs",
+    "db:push": "drizzle-kit push",
+    "db:pull": "drizzle-kit pull",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@blobatar/react": "^2.7.0",
+    "@cloudflare/kumo": "^2.14.0",
+    "@libsql/client": "^0.18.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-devtools": "0.10.13",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-router": "1.170.41",
+    "@tanstack/react-router-devtools": "1.167.2",
+    "@tanstack/react-start": "1.168.60",
+    "@types/nodemailer": "^8.0.2",
+    "better-auth": "^1.5.3",
+    "better-sqlite3": "^12.6.2",
+    "blobatar": "^2.7.0",
+    "drizzle-kit": "^0.31.9",
+    "drizzle-orm": "^0.45.1",
+    "nitro": "3.0.260610-beta",
+    "nodemailer": "^10.0.16",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwindcss": "^4.1.18",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@tanstack/devtools-vite": "0.8.5",
+    "@tanstack/eslint-config": "0.4.0",
+    "@tanstack/router-cli": "^1.132.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "dotenv": "^17.3.1",
+    "eslint": "^9.20.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss",
+      "better-sqlite3"
+    ]
+  }
+}

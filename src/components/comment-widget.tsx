@@ -1,0 +1,651 @@
+import { useEffect, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button, Input } from '@cloudflare/kumo'
+import {
+  ArrowBendUpLeftIcon,
+  ArrowRightIcon,
+  EyeIcon,
+  HeartIcon,
+  SignInIcon,
+  SignOutIcon,
+  XIcon,
+  ChatCircleIcon,
+  ArrowSquareOutIcon,
+} from '@phosphor-icons/react'
+import { api, errorText, queryString } from '../lib/api'
+import { authClient } from '../lib/auth-client'
+import { profileUrl } from '../lib/validation'
+import { AuthForm } from './auth-form'
+import { Avatar } from './avatar'
+import { AppDialog, QueryError, focusContent } from './ui'
+import { Markdown } from './markdown'
+import { Pagination } from './pagination'
+import type { CommentList, CommentLocation } from '../server/api.server'
+
+type Config = {
+  name: string
+  allowAnonymous: boolean
+  theme: 'auto' | 'light' | 'dark'
+  challenge: string
+}
+export type WidgetOptions = {
+  siteId: string
+  pageUrl: string
+  pageKey?: string
+  theme?: 'auto' | 'light' | 'dark'
+  accent?: string
+}
+
+export function CommentWidget({ options }: { options: WidgetOptions }) {
+  const queryClient = useQueryClient()
+  const config = useQuery({
+    queryKey: [
+      'widget-config',
+      options.siteId,
+      options.pageUrl,
+      options.pageKey,
+    ],
+    queryFn: ({ signal }) =>
+      api<Config>(`config?${queryString(options)}`, { signal }),
+    staleTime: 300_000,
+  })
+  const session = authClient.useSession()
+  const [authOpen, setAuthOpen] = useState(false)
+  const [reply, setReply] = useState<{ id: string; author: string } | null>(
+    null,
+  )
+  const [text, setText] = useState('')
+  const [preview, setPreview] = useState(false)
+  const [notice, setNotice] = useState('')
+  const [error, setError] = useState('')
+  const [sort, setSort] = useState<'newest' | 'oldest' | 'popular'>('newest')
+  const [page, setPage] = useState(1)
+  const [expandPath, setExpandPath] = useState<string[]>([])
+  const [mode, setMode] = useState<'light' | 'dark'>(() =>
+    options.theme === 'dark' ||
+    (!options.theme &&
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-color-scheme: dark)').matches)
+      ? 'dark'
+      : 'light',
+  )
+  const textRef = useRef(text)
+  const replyRef = useRef(reply)
+  const editorRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    textRef.current = text
+  }, [text])
+  useEffect(() => {
+    replyRef.current = reply
+  }, [reply])
+  const standaloneLogin =
+    typeof window !== 'undefined' &&
+    window.parent === window &&
+    new URLSearchParams(window.location.search).get('login') === '1'
+  useEffect(() => {
+    if (standaloneLogin) setAuthOpen(true)
+  }, [standaloneLogin])
+  function openLogin() {
+    if (window.parent !== window) {
+      const target = new URL(window.location.href)
+      target.searchParams.set('login', '1')
+      const opened = window.open(target.href, '_blank', 'noopener,noreferrer')
+      if (!opened) setError('浏览器阻止了登录窗口，请允许弹出窗口后重试。')
+    } else setAuthOpen(true)
+  }
+  const theme = options.theme || config.data?.theme || 'auto'
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const update = () => {
+      const next = theme === 'auto' ? (media.matches ? 'dark' : 'light') : theme
+      setMode(next)
+      document.documentElement.dataset.mode = next
+    }
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [theme])
+  useEffect(() => {
+    if (window.parent === window) return
+    let origin: string
+    try {
+      origin = new URL(options.pageUrl).origin
+    } catch {
+      return
+    }
+    const notify = () =>
+      window.parent.postMessage(
+        {
+          type: 'ascs:resize',
+          siteId: options.siteId,
+          height: document.documentElement.scrollHeight,
+        },
+        origin,
+      )
+    const observer = new ResizeObserver(notify)
+    observer.observe(document.body)
+    notify()
+    return () => observer.disconnect()
+  }, [options.siteId, options.pageUrl])
+  useEffect(() => {
+    if (session.data) setAuthOpen(false)
+  }, [session.data])
+  const list = useQuery({
+    queryKey: [
+      'comments',
+      options.siteId,
+      options.pageUrl,
+      options.pageKey,
+      undefined,
+      sort,
+      page,
+    ],
+    queryFn: ({ signal }) =>
+      api<CommentList>(`comments?${queryString({ ...options, sort, page })}`, {
+        signal,
+      }),
+    enabled: !!config.data,
+  })
+  const send = useMutation({
+    mutationFn: (input: Record<string, unknown>) =>
+      api<{ id: string; status: string }>('comments', {
+        method: 'POST',
+        body: input,
+      }),
+    onSuccess: async (result, variables) => {
+      const submittedText = String(variables.body || '')
+      const submittedReply = variables.parentId
+        ? String(variables.parentId)
+        : undefined
+      if (
+        textRef.current === submittedText &&
+        (!submittedReply || replyRef.current?.id === submittedReply)
+      ) {
+        setText('')
+        setReply(null)
+        setPreview(false)
+      }
+      setNotice(
+        result.status === 'approved'
+          ? '评论已发布'
+          : '评论已收到，审核通过后会显示',
+      )
+      setError('')
+      if (result.status === 'approved' && sort !== 'newest') {
+        try {
+          const location = await api<CommentLocation>(
+            `comments/locate?${queryString({ ...options, sort, commentId: result.id })}`,
+          )
+          setPage(location.path[0]?.page || 1)
+          setExpandPath(location.path.map((item) => item.id))
+        } catch {
+          setPage(1)
+        }
+      } else setPage(1)
+      await queryClient.invalidateQueries({
+        queryKey: ['comments', options.siteId],
+      })
+      await config.refetch()
+    },
+    onError: (errorValue) => {
+      setError(errorText(errorValue))
+    },
+  })
+  if (config.isPending)
+    return (
+      <main className="widget" role="status">
+        正在加载评论…
+      </main>
+    )
+  if (config.error)
+    return (
+      <main className="widget">
+        <QueryError error={config.error} retry={config.refetch} />
+      </main>
+    )
+  const formDisabled = send.isPending || session.isPending
+  return (
+    <main
+      className="widget"
+      data-mode={mode}
+      style={
+        options.accent && /^#[0-9a-f]{6}$/i.test(options.accent)
+          ? ({ '--accent': options.accent } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <header className="widget-heading">
+        <h1>
+          评论 <span>{list.data?.total || 0}</span>
+        </h1>
+        {session.isPending ? (
+          <span role="status" className="text-muted">
+            正在检查登录状态…
+          </span>
+        ) : session.data ? (
+          <div className="flex flex-1 justify-end gap-2 items-center min-w-0">
+            <Avatar
+              name={session.data.user.name}
+              image={session.data.user.image}
+            />
+            <a
+              href="/profile"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-link inline-flex min-w-0 items-center gap-1"
+              title={`${session.data.user.name} · 个人设置（在新窗口打开）`}
+              aria-label={`${session.data.user.name}，个人设置（在新窗口打开）`}
+            >
+              <span className="truncate">{session.data.user.name}</span>
+              <ArrowSquareOutIcon
+                size={14}
+                className="shrink-0"
+                aria-hidden="true"
+              />
+            </a>
+            <Button
+              shape="square"
+              variant="ghost"
+              aria-label="退出登录"
+              title="退出登录"
+              className="shrink-0"
+              onClick={async () => {
+                const result = await authClient.signOut()
+                if (result.error) setError(result.error.message || '退出失败')
+                else
+                  await queryClient.invalidateQueries({
+                    queryKey: ['comments', options.siteId],
+                  })
+              }}
+            >
+              <SignOutIcon size={17} />
+            </Button>
+          </div>
+        ) : (
+          <Button icon={SignInIcon} onClick={openLogin}>
+            登录
+          </Button>
+        )}
+      </header>
+      {!config.data.allowAnonymous && !session.data ? (
+        <div className="empty-state">
+          <ChatCircleIcon size={30} aria-hidden="true" />
+          <div className="empty-copy">
+            <p>此站点需要登录后发表评论。</p>
+            <Button onClick={openLogin}>登录后评论</Button>
+          </div>
+        </div>
+      ) : (
+        <form
+          className="comment-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            setNotice('')
+            setError('')
+            const form = new FormData(event.currentTarget)
+            send.mutate({
+              ...options,
+              theme: undefined,
+              accent: undefined,
+              parentId: reply?.id,
+              body: text,
+              author: session.data ? undefined : String(form.get('author')),
+              email: session.data ? undefined : String(form.get('email')),
+              website: String(form.get('website') || ''),
+              challenge: config.data.challenge,
+            })
+          }}
+        >
+          {reply && (
+            <div className="reply-target">
+              <span className="h-lh flex items-center shrink-0">
+                <ArrowBendUpLeftIcon size={16} aria-hidden="true" />
+              </span>
+              <span className="break-words">回复 {reply.author}</span>
+              <Button
+                type="button"
+                shape="square"
+                variant="ghost"
+                aria-label="取消回复"
+                title="取消回复"
+                disabled={formDisabled}
+                onClick={() => setReply(null)}
+              >
+                <XIcon size={16} />
+              </Button>
+            </div>
+          )}
+          {!session.data && (
+            <div className="anonymous-fields">
+              <Input
+                label="昵称"
+                name="author"
+                required
+                maxLength={60}
+                autoComplete="nickname"
+                disabled={formDisabled}
+              />
+              <Input
+                label="邮箱（不公开）"
+                description="仅用于通知和防止重复提交，不会展示给其他人。"
+                name="email"
+                type="email"
+                required
+                maxLength={254}
+                autoComplete="email"
+                disabled={formDisabled}
+              />
+            </div>
+          )}
+          <label className="sr-only" htmlFor="comment-text">
+            评论内容
+          </label>
+          {preview ? (
+            <div className="preview" tabIndex={0} aria-label="评论预览">
+              <Markdown>{text || ' '}</Markdown>
+            </div>
+          ) : (
+            <textarea
+              ref={editorRef}
+              id="comment-text"
+              name="body"
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              required
+              maxLength={5000}
+              rows={5}
+              placeholder="写下你的评论…"
+              disabled={formDisabled}
+              aria-describedby="comment-help"
+            />
+          )}
+          <div className="honeypot" aria-hidden="true">
+            <label htmlFor="website">Website</label>
+            <input
+              id="website"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+            />
+          </div>
+          <div className="composer-footer">
+            <div className="composer-help">
+              <span id="comment-help" className="text-muted">
+                支持 Markdown · {text.length}/5000
+              </span>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                shape="square"
+                aria-label={preview ? '编辑评论' : '预览评论'}
+                title={preview ? '编辑评论' : '预览评论'}
+                aria-pressed={preview}
+                disabled={formDisabled}
+                onClick={() => setPreview(!preview)}
+              >
+                <EyeIcon size={17} />
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                icon={ArrowRightIcon}
+                disabled={!text.trim() || formDisabled}
+                loading={send.isPending}
+              >
+                发布评论
+              </Button>
+            </div>
+          </div>
+        </form>
+      )}
+      {(send.error || error) && (
+        <p role="alert" className="error-box mt-3">
+          {error || errorText(send.error)}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="success-box mt-3">
+          {notice}
+        </p>
+      )}
+      <div className="widget-list-heading">
+        <h2>讨论</h2>
+        <label className="sr-only" htmlFor="comment-sort">
+          排序方式
+        </label>
+        <select
+          id="comment-sort"
+          value={sort}
+          onChange={(event) => {
+            setSort(event.target.value as typeof sort)
+            setPage(1)
+          }}
+        >
+          <option value="newest">最新</option>
+          <option value="oldest">最早</option>
+          <option value="popular">最热</option>
+        </select>
+      </div>
+      {list.isPending ? (
+        <p role="status" className="py-6 text-muted">
+          正在加载…
+        </p>
+      ) : list.error ? (
+        <QueryError error={list.error} retry={list.refetch} />
+      ) : !list.data.items.length ? (
+        <p className="widget-empty">暂无评论</p>
+      ) : (
+        list.data.items.map((comment) => (
+          <Thread
+            key={comment.id}
+            comment={comment}
+            options={options}
+            sort={sort}
+            expandPath={expandPath}
+            onReply={(target) => {
+              setReply(target)
+              setPreview(false)
+              setNotice('')
+              requestAnimationFrame(() => {
+                focusContent(editorRef.current)
+                editorRef.current?.focus()
+              })
+              document
+                .querySelector('.comment-form')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          />
+        ))
+      )}
+      <Pagination
+        page={page}
+        setPage={(next) => {
+          setPage(next)
+          requestAnimationFrame(() => {
+            document
+              .querySelector('.widget-list-heading')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          })
+        }}
+        hasMore={!!list.data?.hasMore}
+        loading={list.isFetching}
+        totalPages={list.data?.totalPages}
+      />
+      <footer className="widget-footer">
+        <a
+          className="text-link"
+          href="/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img src="/brand.svg" alt="" width="16" height="16" />
+          ASCS
+        </a>
+      </footer>
+      <AppDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        title="登录 ASCS"
+        description={
+          standaloneLogin
+            ? '登录完成后请返回原文章窗口继续评论。'
+            : '登录后可以使用账号发表评论、回复和点赞。'
+        }
+      >
+        <AuthForm compact />
+      </AppDialog>
+    </main>
+  )
+}
+
+function Thread({
+  comment,
+  options,
+  sort,
+  expandPath,
+  onReply,
+}: {
+  comment: CommentList['items'][number]
+  options: WidgetOptions
+  sort: 'newest' | 'oldest' | 'popular'
+  expandPath: string[]
+  onReply: (comment: { id: string; author: string }) => void
+}) {
+  const queryClient = useQueryClient()
+  const [expanded, setExpanded] = useState(false)
+  const [page, setPage] = useState(1)
+  const [liked, setLiked] = useState(comment.liked)
+  useEffect(() => setLiked(comment.liked), [comment.liked])
+  useEffect(() => {
+    if (expandPath.includes(comment.id)) setExpanded(true)
+  }, [comment.id, expandPath])
+  const replies = useQuery({
+    queryKey: [
+      'comments',
+      options.siteId,
+      options.pageUrl,
+      options.pageKey,
+      comment.id,
+      sort,
+      page,
+    ],
+    queryFn: ({ signal }) =>
+      api<CommentList>(
+        `comments?${queryString({ ...options, parentId: comment.id, sort, page })}`,
+        { signal },
+      ),
+    enabled: expanded,
+  })
+  const like = useMutation({
+    mutationFn: () =>
+      api<{ liked: boolean }>('likes', {
+        method: 'POST',
+        body: { ...options, commentId: comment.id },
+      }),
+    onSuccess: async (result) => {
+      setLiked(result.liked)
+      await queryClient.invalidateQueries({
+        queryKey: ['comments', options.siteId],
+      })
+    },
+  })
+  return (
+    <article className="thread">
+      <div className="thread-main">
+        <Avatar name={comment.author} image={comment.image} />
+        <div className="min-w-0 flex-1">
+          <div className="comment-meta">
+            {comment.website &&
+            profileUrl.safeParse(comment.website).success ? (
+              <a
+                href={comment.website}
+                target="_blank"
+                rel="nofollow noopener noreferrer ugc"
+                className="text-link break-words font-medium"
+              >
+                {comment.author}
+              </a>
+            ) : (
+              <strong className="break-words">{comment.author}</strong>
+            )}
+            <time>
+              {new Date(comment.createdAt).toLocaleDateString('zh-CN')}
+            </time>
+          </div>
+          {comment.status === 'deleted' ? (
+            <p className="text-muted py-2">评论已删除</p>
+          ) : (
+            <Markdown>{comment.body}</Markdown>
+          )}
+          <div className="thread-actions">
+            {comment.status !== 'deleted' && (
+              <>
+                <Button
+                  variant="ghost"
+                  aria-label={liked ? '取消点赞' : '点赞'}
+                  aria-pressed={liked}
+                  loading={like.isPending}
+                  onClick={() => like.mutate()}
+                >
+                  <HeartIcon size={16} weight={liked ? 'fill' : 'regular'} />
+                  {comment.likes}
+                </Button>
+                {comment.depth < 4 && (
+                  <Button
+                    variant="ghost"
+                    icon={ArrowBendUpLeftIcon}
+                    onClick={() => onReply(comment)}
+                  >
+                    回复
+                  </Button>
+                )}
+              </>
+            )}
+            {comment.replies > 0 && (
+              <Button
+                variant="ghost"
+                onClick={() => setExpanded(!expanded)}
+                aria-expanded={expanded}
+              >
+                {expanded ? '收起回复' : `${comment.replies} 条回复`}
+              </Button>
+            )}
+          </div>
+          {like.error && (
+            <p role="alert" className="error-box">
+              {errorText(like.error)}
+            </p>
+          )}
+        </div>
+      </div>
+      {expanded && (
+        <div className="replies">
+          {replies.isPending ? (
+            <p role="status">正在加载回复…</p>
+          ) : replies.error ? (
+            <QueryError error={replies.error} retry={replies.refetch} />
+          ) : (
+            replies.data.items.map((reply) => (
+              <Thread
+                key={reply.id}
+                comment={reply}
+                options={options}
+                sort={sort}
+                expandPath={expandPath}
+                onReply={onReply}
+              />
+            ))
+          )}
+          <Pagination
+            page={page}
+            setPage={setPage}
+            hasMore={!!replies.data?.hasMore}
+            loading={replies.isFetching}
+            totalPages={replies.data?.totalPages}
+          />
+        </div>
+      )}
+    </article>
+  )
+}
