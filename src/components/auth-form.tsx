@@ -2,16 +2,13 @@ import { useEffect, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
-import {
-  ArrowRightIcon,
-  GithubLogoIcon,
-  GoogleLogoIcon,
-  SquaresFourIcon,
-} from '@phosphor-icons/react'
+import { ArrowRightIcon } from '@phosphor-icons/react'
+import { AUTH_PROVIDERS } from './auth-providers'
 import { authClient } from '../lib/auth-client'
 import { api, errorText, fieldError } from '../lib/api'
 import { resetAuthCaches } from '../lib/cache'
 import { queryKeys, staleTimes } from '../lib/query-keys'
+import type { AuthProviderId } from './auth-providers'
 
 export function AuthForm({
   compact = false,
@@ -85,7 +82,7 @@ export function AuthForm({
       setBusy(false)
     }
   }
-  async function social(provider: 'github' | 'google' | 'microsoft') {
+  async function social(provider: AuthProviderId) {
     setBusy(true)
     setError(null)
     try {
@@ -202,42 +199,23 @@ export function AuthForm({
           第三方登录暂时不可用，你仍可以使用邮箱登录。
         </p>
       )}
-      {(providers.data?.github ||
-        providers.data?.google ||
-        providers.data?.microsoft) &&
+      {AUTH_PROVIDERS.some((provider) => providers.data?.[provider.id]) &&
         mode !== 'reset' && (
           <>
             <div className="flex flex-wrap gap-2 mt-4">
-              {providers.data.github && (
+              {AUTH_PROVIDERS.filter(
+                (provider) => providers.data?.[provider.id],
+              ).map((provider) => (
                 <Button
+                  key={provider.id}
                   className="flex-1"
-                  onClick={() => social('github')}
+                  onClick={() => social(provider.id)}
                   disabled={busy}
                 >
-                  <GithubLogoIcon size={18} />
-                  GitHub
+                  <provider.Icon size={18} />
+                  {provider.name}
                 </Button>
-              )}
-              {providers.data.google && (
-                <Button
-                  className="flex-1"
-                  onClick={() => social('google')}
-                  disabled={busy}
-                >
-                  <GoogleLogoIcon size={18} />
-                  Google
-                </Button>
-              )}
-              {providers.data.microsoft && (
-                <Button
-                  className="flex-1"
-                  onClick={() => social('microsoft')}
-                  disabled={busy}
-                >
-                  <SquaresFourIcon size={18} />
-                  Microsoft
-                </Button>
-              )}
+              ))}
             </div>
             {inFrame && (
               <p className="text-muted mt-2">

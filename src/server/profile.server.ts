@@ -1,8 +1,9 @@
 import { and, eq, isNull } from 'drizzle-orm'
+import { z } from 'zod'
 import { db } from '../db'
 import { account, user } from '../db/schema'
 import { emailChangeInput, profileInput } from '../lib/validation'
-import { body, params } from './http.server'
+import { body } from './http.server'
 import { enqueueMail } from './mail.server'
 import {
   baseOrigin,
@@ -107,39 +108,45 @@ export async function requestEmailChange(request: Request) {
   await enqueueMail(
     newEmail,
     '确认修改邮箱',
-    `请打开以下链接确认将账号邮箱修改为 ${newEmail}：\n${baseOrigin()}/api/v1/profile/email/confirm?token=${encodeURIComponent(token)}\n链接 1 小时内有效。如果这不是你的操作，请忽略此邮件。`,
+    `请打开以下链接确认将账号邮箱修改为 ${newEmail}：\n${baseOrigin()}/confirm-email-change?token=${encodeURIComponent(token)}\n链接 1 小时内有效。如果这不是你的操作，请忽略此邮件。`,
   )
   return { status: true }
 }
 
-export async function confirmEmailChange(request: Request) {
-  const target = (reason: string) =>
-    new Response(null, {
-      status: 302,
-      headers: { Location: `${baseOrigin()}/profile?emailChange=${reason}` },
-    })
+export type EmailChangeResult = {
+  status: 'ok' | 'used' | 'invalid' | 'unavailable'
+}
+
+// A POST endpoint: the confirmation link opens a page that submits the token in
+// the request body, so the state change never rides along on a GET.
+export async function confirmEmailChange(
+  request: Request,
+): Promise<EmailChangeResult> {
   try {
     await limit(`email-confirm:${ipHash(request)}`, 20)
-    const payload = readEmailChangeToken(params(request).token || '')
-    if (!payload) return target('invalid')
+    const input = z
+      .object({ token: z.string().min(1).max(4000) })
+      .parse(await body(request))
+    const payload = readEmailChangeToken(input.token)
+    if (!payload) return { status: 'invalid' }
     const person = await db
       .select()
       .from(user)
       .where(eq(user.id, payload.userId))
       .then((rows) => rows.at(0))
-    if (!person || person.disabled) return target('invalid')
-    if (person.emailChangeUsedAt) return target('used')
+    if (!person || person.disabled) return { status: 'invalid' }
+    if (person.emailChangeUsedAt) return { status: 'used' }
     if (person.email.toLowerCase() !== payload.fromEmail)
-      return target('invalid')
+      return { status: 'invalid' }
     if (hasCredential(await listAccounts(person.id)))
-      return target('unavailable')
+      return { status: 'unavailable' }
     const existing = await db
       .select({ id: user.id })
       .from(user)
       .where(eq(user.email, payload.newEmail))
       .limit(1)
     if (existing.length && existing[0].id !== person.id)
-      return target('invalid')
+      return { status: 'invalid' }
     const updated = await db
       .update(user)
       .set({
@@ -150,8 +157,8 @@ export async function confirmEmailChange(request: Request) {
       })
       .where(and(eq(user.id, person.id), isNull(user.emailChangeUsedAt)))
       .returning({ id: user.id })
-    return target(updated.length ? 'ok' : 'invalid')
+    return { status: updated.length ? 'ok' : 'invalid' }
   } catch {
-    return target('invalid')
+    return { status: 'invalid' }
   }
 }

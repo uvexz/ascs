@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useBlocker, useSearch } from '@tanstack/react-router'
+import { Link, useBlocker } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { ArrowLeftIcon } from '@phosphor-icons/react'
@@ -15,31 +15,10 @@ import { QueryError } from './ui'
 import type { ProfileInput } from '../lib/validation'
 import type { Profile } from '../server/profile.server'
 
-const emailChangeMessages: Record<string, string> = {
-  ok: '邮箱已更新，后续通知将发送到新邮箱。',
-  used: '你已经使用过修改邮箱的机会。',
-  invalid: '确认链接无效或已过期。',
-  unavailable: '当前账号不支持修改邮箱。',
-}
-
-export function ProfilePage({
-  authenticated,
-  initialUserId,
-}: {
-  authenticated: boolean
-  initialUserId?: string
-}) {
+export function ProfilePage({ authenticated }: { authenticated: boolean }) {
   const session = authClient.useSession()
-  const search = useSearch({ from: '/profile' })
-  const emailNotice = search.emailChange
-    ? emailChangeMessages[search.emailChange]
-    : undefined
-  const [userId, setUserId] = useState(initialUserId)
-  useEffect(() => {
-    if (session.data) setUserId(session.data.user.id)
-  }, [session.data])
   const profile = useQuery({
-    ...profileQuery(session.data?.user.id || userId),
+    ...profileQuery(),
     enabled: authenticated,
   })
   if (!authenticated && !profile.data)
@@ -66,14 +45,6 @@ export function ProfilePage({
             <p className="text-muted mt-1">管理你的昵称、头像、网站和简介。</p>
           </div>
         </div>
-        {emailNotice && (
-          <p
-            role="status"
-            className={`${search.emailChange === 'ok' ? 'success-box' : 'error-box'} mb-6`}
-          >
-            {emailNotice}
-          </p>
-        )}
         {!session.data && profile.data && (
           <div className="grid gap-3 mb-6">
             <p role="alert" className="error-box">
@@ -143,7 +114,7 @@ function ProfileForm({
       setSaved(next)
       setDraft(next)
       setNotice('个人资料已保存。')
-      queryClient.setQueryData(queryKeys.profile(profile.id), updated)
+      queryClient.setQueryData(queryKeys.profile(), updated)
       void refreshSession()
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.scope.dashboard }),

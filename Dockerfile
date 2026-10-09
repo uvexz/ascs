@@ -4,6 +4,9 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
+# Drop dev-only tooling (eslint, prettier, vite, drizzle-kit, types, ...) from
+# the runtime image; the migration script only needs tsx and the prod deps.
+RUN npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 DATABASE_URL=file:/app/data/ascs.db

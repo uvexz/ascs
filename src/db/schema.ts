@@ -8,22 +8,29 @@ import {
 } from 'drizzle-orm/sqlite-core'
 
 const timestamp = (name: string) => integer(name, { mode: 'timestamp_ms' })
-export const user = sqliteTable('user', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  email: text('email').notNull().unique(),
-  emailVerified: integer('email_verified', { mode: 'boolean' })
-    .notNull()
-    .default(false),
-  image: text('image'),
-  website: text('website'),
-  bio: text('bio'),
-  createdAt: timestamp('created_at').notNull(),
-  updatedAt: timestamp('updated_at').notNull(),
-  siteLimit: integer('site_limit').notNull().default(0),
-  disabled: integer('disabled', { mode: 'boolean' }).notNull().default(false),
-  emailChangeUsedAt: integer('email_change_used_at', { mode: 'timestamp_ms' }),
-})
+export const user = sqliteTable(
+  'user',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    email: text('email').notNull().unique(),
+    emailVerified: integer('email_verified', { mode: 'boolean' })
+      .notNull()
+      .default(false),
+    image: text('image'),
+    website: text('website'),
+    bio: text('bio'),
+    createdAt: timestamp('created_at').notNull(),
+    updatedAt: timestamp('updated_at').notNull(),
+    siteLimit: integer('site_limit').notNull().default(0),
+    disabled: integer('disabled', { mode: 'boolean' }).notNull().default(false),
+    emailChangeUsedAt: integer('email_change_used_at', {
+      mode: 'timestamp_ms',
+    }),
+  },
+  // Backs the instance admin user list (ORDER BY created_at DESC).
+  (t) => [index('user_created_idx').on(t.createdAt)],
+)
 export const session = sqliteTable(
   'session',
   {
@@ -87,26 +94,31 @@ export const instanceAdmins = sqliteTable('instance_admins', {
     .primaryKey()
     .references(() => user.id, { onDelete: 'cascade' }),
 })
-export const sites = sqliteTable('sites', {
-  id: text('id').primaryKey(),
-  name: text('name').notNull(),
-  origin: text('origin').notNull().unique(),
-  verificationToken: text('verification_token').notNull(),
-  verifiedAt: integer('verified_at'),
-  allowAnonymous: integer('allow_anonymous', { mode: 'boolean' })
-    .notNull()
-    .default(true),
-  moderation: text('moderation', { enum: ['all', 'anonymous', 'none'] })
-    .notNull()
-    .default('anonymous'),
-  theme: text('theme', { enum: ['auto', 'light', 'dark'] })
-    .notNull()
-    .default('auto'),
-  notificationEmail: text('notification_email'),
-  blockedWords: text('blocked_words').notNull().default(''),
-  createdAt: integer('created_at').notNull(),
-  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
-})
+export const sites = sqliteTable(
+  'sites',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    origin: text('origin').notNull().unique(),
+    verificationToken: text('verification_token').notNull(),
+    verifiedAt: integer('verified_at'),
+    allowAnonymous: integer('allow_anonymous', { mode: 'boolean' })
+      .notNull()
+      .default(true),
+    moderation: text('moderation', { enum: ['all', 'anonymous', 'none'] })
+      .notNull()
+      .default('anonymous'),
+    theme: text('theme', { enum: ['auto', 'light', 'dark'] })
+      .notNull()
+      .default('auto'),
+    notificationEmail: text('notification_email'),
+    blockedWords: text('blocked_words').notNull().default(''),
+    createdAt: integer('created_at').notNull(),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  },
+  // Backs the dashboard and instance admin site lists (ORDER BY created_at).
+  (t) => [index('sites_created_idx').on(t.createdAt)],
+)
 export const members = sqliteTable(
   'members',
   {
@@ -208,7 +220,11 @@ export const mailQueue = sqliteTable(
     sentAt: integer('sent_at'),
     lastError: text('last_error'),
   },
-  (t) => [index('mail_due_idx').on(t.sentAt, t.availableAt, t.leaseUntil)],
+  (t) => [
+    index('mail_due_idx').on(t.sentAt, t.availableAt, t.leaseUntil),
+    // Backs the instance admin mail list (ORDER BY available_at DESC).
+    index('mail_available_idx').on(t.availableAt),
+  ],
 )
 export const systemSettings = sqliteTable('system_settings', {
   id: integer('id').primaryKey(),

@@ -17,6 +17,11 @@ const nitroIgnoredWarningCodes = new Set([
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
+  build: {
+    // The Kumo + TanStack Router vendor chunk is intentionally large; raise the
+    // advisory threshold so a clean build stays warning-free.
+    chunkSizeWarningLimit: 700,
+  },
   plugins: [
     devtools(),
     nitro({

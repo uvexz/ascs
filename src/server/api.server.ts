@@ -239,7 +239,7 @@ async function createComment(request: Request) {
   await limit(`comment:${site.id}:${ip}`, 5, 60_000)
   await limit(`comment-global:${ip}`, 40, 3_600_000)
   verifyChallenge(input.challenge, site.id, pageKey)
-  check(!input.website, 400, '评论未通过垃圾检测')
+  check(!input.honeypot, 400, '评论未通过垃圾检测')
   const session = await getSession(request)
   check(site.allowAnonymous || session, 401, '此站点需要登录后评论')
   check(session || (input.author && input.email), 400, '匿名评论需要昵称和邮箱')
@@ -376,37 +376,37 @@ async function toggleLike(request: Request) {
   )
 }
 
-export async function dashboard(request: Request, siteId?: string) {
+export async function dashboard(request: Request) {
   const session = await requireSession(request)
   const admin = await isAdmin(session.user.id)
-  const selected = siteId ?? new URL(request.url).searchParams.get('site')
+  // Only expose the fields the shell needs; verification tokens, blocked words
+  // and notification addresses stay behind the site-detail endpoint.
+  const siteFields = {
+    id: sites.id,
+    name: sites.name,
+    origin: sites.origin,
+    verifiedAt: sites.verifiedAt,
+    enabled: sites.enabled,
+  }
   let accessible: Array<
-    typeof sites.$inferSelect & { role?: 'owner' | 'moderator' }
+    Pick<typeof sites.$inferSelect, keyof typeof siteFields> & {
+      role?: 'owner' | 'moderator'
+    }
   >
   if (admin) {
-    const rows = await db
-      .select()
+    accessible = await db
+      .select(siteFields)
       .from(sites)
       .orderBy(desc(sites.createdAt))
       .limit(PAGE_SIZE)
-    if (selected && !rows.some((site) => site.id === selected)) {
-      const extra = await db
-        .select()
-        .from(sites)
-        .where(eq(sites.id, selected))
-        .limit(1)
-        .then((found) => found.at(0))
-      if (extra) rows.unshift(extra)
-    }
-    accessible = rows
   } else {
     accessible = await db
-      .select({ site: sites, role: members.role })
+      .select({ ...siteFields, role: members.role })
       .from(members)
       .innerJoin(sites, eq(sites.id, members.siteId))
       .where(eq(members.userId, session.user.id))
-      .then((rows) => rows.map((row) => ({ ...row.site, role: row.role })))
   }
+  const ownedSites = accessible.filter((site) => site.role === 'owner').length
   return {
     user: {
       id: session.user.id,
@@ -416,17 +416,12 @@ export async function dashboard(request: Request, siteId?: string) {
     },
     admin,
     siteLimit: session.user.siteLimit,
-    ownedSites: accessible.filter(
-      (site) => 'role' in site && site.role === 'owner',
-    ).length,
-    canCreateSite:
-      admin ||
-      accessible.filter((site) => 'role' in site && site.role === 'owner')
-        .length < session.user.siteLimit,
+    ownedSites,
+    canCreateSite: admin || ownedSites < session.user.siteLimit,
     instance: await publicSettings(),
     sites: accessible.map((site) => ({
       ...site,
-      role: 'role' in site ? site.role : ('owner' as const),
+      role: site.role ?? ('owner' as const),
     })),
   }
 }
@@ -614,7 +609,17 @@ export async function siteDetail(
       .groupBy(sql`date(${comments.createdAt}/1000, 'unixepoch')`),
   ])
   return {
-    site,
+    // Verification token, blocked words and the notification address are
+    // owner-only; moderators get the rest of the site record.
+    site:
+      role === 'owner'
+        ? site
+        : {
+            ...site,
+            verificationToken: '',
+            blockedWords: '',
+            notificationEmail: null,
+          },
     role,
     stats,
     bans: banned,
@@ -893,9 +898,9 @@ export async function handleApi(request: Request) {
       if (
         path.length === 3 &&
         path[2] === 'confirm' &&
-        request.method === 'GET'
+        request.method === 'POST'
       )
-        return await confirmEmailChange(request)
+        return json(await confirmEmailChange(request))
       throw new HttpError(405, '不支持此请求方法')
     }
     if (path[0] === 'dashboard' && request.method === 'GET')

@@ -8,10 +8,7 @@ import { AuthForm } from '../components/auth-form'
 export const Route = createFileRoute('/widget-login')({
   ssr: false,
   head: () => ({
-    meta: [
-      { title: '登录 ASCS 评论' },
-      { name: 'robots', content: 'noindex' },
-    ],
+    meta: [{ title: '登录 ASCS 评论' }, { name: 'robots', content: 'noindex' }],
   }),
   component: WidgetLogin,
 })

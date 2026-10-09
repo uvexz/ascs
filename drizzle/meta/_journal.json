@@ -36,6 +36,13 @@
       "when": 1791547071454,
       "tag": "0004_slippery_nomad",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791563544639,
+      "tag": "0005_yielding_spiral",
+      "breakpoints": true
     }
   ]
 }

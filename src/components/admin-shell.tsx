@@ -10,46 +10,25 @@ import {
   useSearch,
 } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  Button,
-  DropdownMenu,
-  Input,
-  Sidebar,
-  useSidebar,
-} from '@cloudflare/kumo'
+import { DropdownMenu, Sidebar, useSidebar } from '@cloudflare/kumo'
 import {
   CaretUpDownIcon,
   GlobeIcon,
-  PlusIcon,
   SignOutIcon,
   UserCircleIcon,
 } from '@phosphor-icons/react'
-import { api, ApiError, errorText, fieldError } from '../lib/api'
+import { api, ApiError, errorText } from '../lib/api'
 import { resetAuthCaches } from '../lib/cache'
 import { dashboardQuery, siteDetailQuery } from '../lib/queries'
 import { queryKeys } from '../lib/query-keys'
 import { authClient } from '../lib/auth-client'
 import { AuthForm } from './auth-form'
 import { Avatar } from './avatar'
-import { AppDialog, ErrorBoundary, QueryError } from './ui'
+import { ErrorBoundary, QueryError } from './ui'
+import { CreateSiteDialog, UnsavedChangesDialog } from './admin/admin-dialogs'
 import { navigation, systemNavigation, viewLabel } from './admin/shared'
 import { SiteSwitcher } from './admin/site-picker'
-
-const siteTargets = {
-  comments: '/admin/site/$siteId/comments',
-  statistics: '/admin/site/$siteId/statistics',
-  integration: '/admin/site/$siteId/integration',
-  settings: '/admin/site/$siteId/settings',
-  members: '/admin/site/$siteId/members',
-} as const
-const systemTargets = {
-  overview: '/admin/instance/overview',
-  users: '/admin/instance/users',
-  sites: '/admin/instance/sites',
-  settings: '/admin/instance/settings',
-  mail: '/admin/instance/mail',
-  audit: '/admin/instance/audit',
-} as const
+import type { SiteViewId } from './admin/shared'
 
 export const AdminShellContext = createContext<{
   setSettingsDirty: (dirty: boolean) => void
@@ -91,20 +70,32 @@ export function AdminShell() {
   const systemView = pathname.startsWith('/admin/instance')
   const lastSegment = pathname.split('/').filter(Boolean).at(-1)
   const siteView = pathname.startsWith('/admin/site/')
-    ? (lastSegment as keyof typeof siteTargets | undefined)
+    ? (lastSegment as SiteViewId | undefined)
     : undefined
   const dashboard = useQuery({
-    ...dashboardQuery(activeSiteId),
+    ...dashboardQuery(),
     enabled: authenticated,
   })
-  const current =
-    dashboard.data?.sites.find((site) => site.id === activeSiteId) ||
-    dashboard.data?.sites[0]
-  const owner = current?.role === 'owner'
   const detail = useQuery({
-    ...siteDetailQuery(current?.id ?? ''),
-    enabled: !!current && !systemView,
+    ...siteDetailQuery(activeSiteId ?? ''),
+    enabled: !!activeSiteId && !systemView,
   })
+  // The dashboard list is capped, so the active site may only be present in the
+  // site-detail response; fall back to the first accessible site otherwise.
+  const current = activeSiteId
+    ? (dashboard.data?.sites.find((site) => site.id === activeSiteId) ??
+      (detail.data
+        ? {
+            id: detail.data.site.id,
+            name: detail.data.site.name,
+            origin: detail.data.site.origin,
+            verifiedAt: detail.data.site.verifiedAt,
+            enabled: detail.data.site.enabled,
+            role: detail.data.role,
+          }
+        : undefined))
+    : dashboard.data?.sites[0]
+  const owner = current?.role === 'owner'
   const pendingCount =
     detail.data?.stats.find((stat) => stat.status === 'pending')?.count ?? 0
   const create = useMutation({
@@ -119,6 +110,9 @@ export function AdminShell() {
       })
       await queryClient.invalidateQueries({
         queryKey: queryKeys.scope.sitePicker,
+      })
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.instance,
       })
       await navigate({
         to: '/admin/site/$siteId/integration',
@@ -171,9 +165,9 @@ export function AdminShell() {
     setCreateOpen(true)
   }
   const selectSite = (siteId: string) => {
-    const target = siteView && siteView in siteTargets ? siteView : 'comments'
+    const view = navigation.find((item) => item.id === siteView)
     setFeedback('')
-    void navigate({ to: siteTargets[target], params: { siteId } })
+    void navigate({ to: (view ?? navigation[0]).to, params: { siteId } })
   }
   const instanceName = dashboard.data.instance.name
   const roleLabel = dashboard.data.admin
@@ -241,7 +235,7 @@ export function AdminShell() {
                       onClick={() =>
                         current &&
                         void navigate({
-                          to: siteTargets[item.id],
+                          to: item.to,
                           params: { siteId: current.id },
                         })
                       }
@@ -264,9 +258,7 @@ export function AdminShell() {
                       icon={item.icon}
                       active={systemView && lastSegment === item.id}
                       tooltip={item.label}
-                      onClick={() =>
-                        void navigate({ to: systemTargets[item.id] })
-                      }
+                      onClick={() => void navigate({ to: item.to })}
                     >
                       <span className="truncate">{item.label}</span>
                     </Sidebar.MenuButton>
@@ -279,7 +271,11 @@ export function AdminShell() {
             <DropdownMenu>
               <DropdownMenu.Trigger
                 render={
-                  <button type="button" className="user-menu-trigger">
+                  <button
+                    type="button"
+                    className="user-menu-trigger"
+                    aria-label={`账号菜单：${dashboard.data.user.name}`}
+                  >
                     <Avatar
                       name={dashboard.data.user.name}
                       image={dashboard.data.user.image}
@@ -375,79 +371,18 @@ export function AdminShell() {
           </footer>
         </div>
       </Sidebar.Provider>
-      <AppDialog
+      <CreateSiteDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
-        title="添加站点"
-        description="添加博客站点后，需要完成 DNS 验证才能启用公开评论。"
-        busy={create.isPending}
-      >
-        <form
-          className="grid gap-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            create.mutate({
-              name: String(form.get('name')),
-              origin: String(form.get('origin')),
-            })
-          }}
-        >
-          <Input
-            label="站点名称"
-            name="name"
-            required
-            maxLength={80}
-            error={fieldError(create.error, 'name')}
-          />
-          <Input
-            label="站点地址"
-            name="origin"
-            type="url"
-            placeholder="https://blog.example.com"
-            required
-            error={fieldError(create.error, 'origin')}
-          />
-          {create.error &&
-            !fieldError(create.error, 'name') &&
-            !fieldError(create.error, 'origin') && (
-              <p role="alert" className="error-box">
-                {errorText(create.error)}
-              </p>
-            )}
-          <div className="flex justify-end gap-2">
-            <Button type="button" onClick={() => setCreateOpen(false)}>
-              取消
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              icon={PlusIcon}
-              loading={create.isPending}
-            >
-              添加站点
-            </Button>
-          </div>
-        </form>
-      </AppDialog>
-      {blocker.status === 'blocked' && (
-        <AppDialog
-          open
-          title="放弃未保存的设置？"
-          description="当前表单有未保存的修改。离开后这些修改会丢失。"
-          alert
-          onOpenChange={(open) => {
-            if (!open) blocker.reset()
-          }}
-        >
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => blocker.reset()}>继续编辑</Button>
-            <Button variant="destructive" onClick={() => blocker.proceed()}>
-              放弃修改
-            </Button>
-          </div>
-        </AppDialog>
-      )}
+        create={create}
+      />
+      <UnsavedChangesDialog
+        open={blocker.status === 'blocked'}
+        onOpenChange={(open) => {
+          if (!open) blocker.reset?.()
+        }}
+        onDiscard={() => blocker.proceed?.()}
+      />
     </AdminShellContext.Provider>
   )
 }

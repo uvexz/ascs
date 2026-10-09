@@ -109,7 +109,9 @@ export const commentInput = pageInput.extend({
   body: z.string().trim().min(1).max(5000),
   author: z.string().trim().min(1).max(60).optional(),
   email: z.email().max(254).optional(),
-  website: z.string().max(200).default(''),
+  // Honeypot: a hidden lure field that legitimate users never fill. Kept
+  // separate from any real profile field so bot traffic cannot alias into one.
+  honeypot: z.string().max(200).default(''),
   challenge: z.string().min(1).max(200),
 })
 export const moderationInput = z.object({

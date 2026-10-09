@@ -1,9 +1,10 @@
+import { useEffect, useState } from 'react'
 import { StatsStrip } from './stats-strip'
 import type { SiteDetail } from '../../server/api.server'
 
-export function Statistics({ detail }: { detail: SiteDetail }) {
+function lastSevenUtcDays() {
   const today = new Date()
-  const days = Array.from({ length: 7 }, (_, index) =>
+  return Array.from({ length: 7 }, (_, index) =>
     new Date(
       Date.UTC(
         today.getUTCFullYear(),
@@ -14,6 +15,15 @@ export function Statistics({ detail }: { detail: SiteDetail }) {
       .toISOString()
       .slice(0, 10),
   )
+}
+
+export function Statistics({ detail }: { detail: SiteDetail }) {
+  // Computed after mount so the server HTML and the first client render agree
+  // (the server's current UTC date can differ across a midnight boundary).
+  const [days, setDays] = useState<string[]>([])
+  useEffect(() => {
+    setDays(lastSevenUtcDays())
+  }, [])
   const counts = days.map(
     (day) => detail.daily.find((item) => item.day === day)?.count || 0,
   )
@@ -33,13 +43,13 @@ export function Statistics({ detail }: { detail: SiteDetail }) {
                 role="listitem"
                 aria-label={`${day}，${count} 条评论`}
               >
-                <span>{count}</span>
-                <div className="bar-track">
+                <span aria-hidden="true">{count}</span>
+                <div className="bar-track" aria-hidden="true">
                   <div
                     style={{ height: count ? `${(count / max) * 100}%` : 0 }}
                   />
                 </div>
-                <time>{day.slice(5)}</time>
+                <time aria-hidden="true">{day.slice(5)}</time>
               </div>
             )
           })}

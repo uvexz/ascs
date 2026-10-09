@@ -16,7 +16,7 @@ export const Route = createFileRoute('/admin/')({
       return
     }
     const data = context.queryClient.getQueryData<Dashboard>(
-      queryKeys.dashboard(undefined),
+      queryKeys.dashboard(),
     )
     if (!data) return
     const site = data.sites.at(0)

@@ -23,57 +23,59 @@ export function Integration({ detail }: { detail: SiteDetail }) {
   const hostname = new URL(detail.site.origin).hostname
   return (
     <>
-      <section className="settings-section">
-        <div className="section-heading">
-          <h2>域名验证</h2>
-          <span
-            className={`badge ${detail.site.verifiedAt ? 'approved' : 'pending'}`}
+      {detail.role === 'owner' && (
+        <section className="settings-section">
+          <div className="section-heading">
+            <h2>域名验证</h2>
+            <span
+              className={`badge ${detail.site.verifiedAt ? 'approved' : 'pending'}`}
+            >
+              {detail.site.verifiedAt ? '已验证' : '待验证'}
+            </span>
+          </div>
+          <p className="section-description">
+            在 DNS 服务商添加 TXT 记录后，等待记录生效，再点击“检查验证”。
+          </p>
+          <dl className="definition-list">
+            <div>
+              <dt>站点地址</dt>
+              <dd>{detail.site.origin}</dd>
+            </div>
+            <div>
+              <dt>TXT 主机记录</dt>
+              <dd>
+                <code>_ascs.{hostname}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>TXT 记录值</dt>
+              <dd>
+                <CopyBlock
+                  text={`ascs-verification=${detail.site.verificationToken}`}
+                />
+              </dd>
+            </div>
+          </dl>
+          <Button
+            icon={ShieldCheckIcon}
+            variant="primary"
+            loading={verify.isPending}
+            onClick={() => verify.mutate()}
           >
-            {detail.site.verifiedAt ? '已验证' : '待验证'}
-          </span>
-        </div>
-        <p className="section-description">
-          在 DNS 服务商添加 TXT 记录后，等待记录生效，再点击“检查验证”。
-        </p>
-        <dl className="definition-list">
-          <div>
-            <dt>站点地址</dt>
-            <dd>{detail.site.origin}</dd>
-          </div>
-          <div>
-            <dt>TXT 主机记录</dt>
-            <dd>
-              <code>_ascs.{hostname}</code>
-            </dd>
-          </div>
-          <div>
-            <dt>TXT 记录值</dt>
-            <dd>
-              <CopyBlock
-                text={`ascs-verification=${detail.site.verificationToken}`}
-              />
-            </dd>
-          </div>
-        </dl>
-        <Button
-          icon={ShieldCheckIcon}
-          variant="primary"
-          loading={verify.isPending}
-          onClick={() => verify.mutate()}
-        >
-          检查验证
-        </Button>
-        {verify.error && (
-          <p role="alert" className="error-box mt-4">
-            {errorText(verify.error)}
-          </p>
-        )}
-        {verify.isSuccess && (
-          <p role="status" className="success-box mt-4">
-            站点验证通过
-          </p>
-        )}
-      </section>
+            检查验证
+          </Button>
+          {verify.error && (
+            <p role="alert" className="error-box mt-4">
+              {errorText(verify.error)}
+            </p>
+          )}
+          {verify.isSuccess && (
+            <p role="status" className="success-box mt-4">
+              站点验证通过
+            </p>
+          )}
+        </section>
+      )}
       <section className="settings-section">
         <h2>嵌入代码</h2>
         <p className="section-description">

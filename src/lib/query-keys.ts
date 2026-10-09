@@ -7,16 +7,26 @@
  * change in one place, so reader and invalidator can never drift apart.
  */
 export const queryKeys = {
-  dashboard: (siteId?: string) => ['dashboard', siteId] as const,
+  // A single dashboard entry per session; the active site is resolved from the
+  // returned site list (falling back to the site detail query), so the key must
+  // not vary with the selected site.
+  dashboard: () => ['dashboard'] as const,
   siteDetail: (siteId?: string) => ['site', siteId] as const,
   sitePicker: (q: string, page: number) => ['site-picker', q, page] as const,
   adminComments: (siteId: string, status: string, page: number) =>
     ['admin-comments', siteId, status, page] as const,
   authConfig: () => ['auth-config'] as const,
-  profile: (userId?: string) => ['profile', userId] as const,
+  // The profile endpoint always returns the current session's profile, so it is
+  // keyed as a singleton rather than by a caller-supplied user id.
+  profile: () => ['profile', 'me'] as const,
   profileAccounts: () => ['profile', 'accounts'] as const,
-  widgetConfig: (siteId: string, pageUrl: string, pageKey?: string) =>
-    ['widget-config', siteId, pageUrl, pageKey] as const,
+  widgetConfig: (
+    siteId: string,
+    pageUrl: string,
+    pageKey: string | undefined,
+    theme: string | undefined,
+    accent: string | undefined,
+  ) => ['widget-config', siteId, pageUrl, pageKey, theme, accent] as const,
   widgetSession: (token: string | null) => ['widget-session', token] as const,
   commentList: (params: {
     siteId: string

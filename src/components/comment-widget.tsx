@@ -1,16 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Input, LinkButton } from '@cloudflare/kumo'
+import { Button, LinkButton } from '@cloudflare/kumo'
 import {
-  ArrowBendUpLeftIcon,
-  ArrowRightIcon,
-  EyeIcon,
+  ChatCircleIcon,
   GearSixIcon,
-  HeartIcon,
   SignInIcon,
   SignOutIcon,
-  XIcon,
-  ChatCircleIcon,
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../lib/api'
 import { authClient } from '../lib/auth-client'
@@ -22,12 +17,13 @@ import {
   setWidgetToken,
   useWidgetSession,
 } from '../lib/widget-session'
-import { profileUrl } from '../lib/validation'
 import { AuthForm } from './auth-form'
 import { Avatar } from './avatar'
+import { CommentComposer } from './comment-composer'
+import { Thread } from './comment-thread'
 import { AppDialog, QueryError, focusContent } from './ui'
-import { Markdown } from './markdown'
 import { Pagination } from './pagination'
+import type { WidgetOptions } from './comment-thread'
 import type { CommentList, CommentLocation } from '../server/api.server'
 
 type Config = {
@@ -36,42 +32,159 @@ type Config = {
   theme: 'auto' | 'light' | 'dark'
   challenge: string
 }
-type WidgetOptions = {
-  siteId: string
-  pageUrl: string
-  pageKey?: string
-  theme?: 'auto' | 'light' | 'dark'
-  accent?: string
+
+type WidgetSession = {
+  data: { user: { id: string; name: string; image?: string | null } } | null
+  isPending: boolean
 }
 
+/**
+ * Chooses the session strategy up front so the cookie-based session hook only
+ * mounts on a top-level page. Inside a cross-origin iframe the cookie session is
+ * unreachable, so that branch talks to the short-lived widget bearer session
+ * instead and never issues the cookie request.
+ */
 export function CommentWidget({ options }: { options: WidgetOptions }) {
+  const embedded = typeof window !== 'undefined' && window.parent !== window
+  return embedded ? (
+    <EmbeddedCommentWidget options={options} />
+  ) : (
+    <InlineCommentWidget options={options} />
+  )
+}
+
+function InlineCommentWidget({ options }: { options: WidgetOptions }) {
+  const queryClient = useQueryClient()
+  const [authOpen, setAuthOpen] = useState(false)
+  const session = authClient.useSession()
+  useEffect(() => {
+    if (session.data) setAuthOpen(false)
+  }, [session.data])
+  return (
+    <>
+      <Widget
+        options={options}
+        session={session}
+        onLogin={() => setAuthOpen(true)}
+        onSignOut={async () => {
+          const result = await authClient.signOut()
+          if (result.error) return result.error.message || '退出失败'
+          resetAuthCaches(queryClient)
+          return null
+        }}
+      />
+      <AppDialog
+        open={authOpen}
+        onOpenChange={setAuthOpen}
+        title="登录 ASCS"
+        description="登录后可以使用账号发表评论、回复和点赞。"
+      >
+        <AuthForm compact />
+      </AppDialog>
+    </>
+  )
+}
+
+function EmbeddedCommentWidget({ options }: { options: WidgetOptions }) {
+  const queryClient = useQueryClient()
+  const [token, setToken] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : getWidgetToken(),
+  )
+  const [loginError, setLoginError] = useState('')
+  const popupRef = useRef<Window | null>(null)
+  const nonceRef = useRef('')
+  const widgetSession = useWidgetSession(token)
+  useEffect(() => {
+    const listener = (event: MessageEvent) => {
+      if (
+        event.origin !== window.location.origin ||
+        event.source !== popupRef.current ||
+        !event.data ||
+        event.data.type !== 'ascs:widget-session' ||
+        event.data.state !== nonceRef.current ||
+        typeof event.data.token !== 'string' ||
+        !event.data.token
+      )
+        return
+      setWidgetToken(event.data.token)
+      setToken(event.data.token)
+      popupRef.current?.close()
+      popupRef.current = null
+      setLoginError('')
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.widgetSession,
+      })
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.comments(options.siteId),
+      })
+    }
+    window.addEventListener('message', listener)
+    return () => window.removeEventListener('message', listener)
+  }, [queryClient, options.siteId])
+  const openLogin = useCallback(() => {
+    const nonce = crypto.randomUUID()
+    nonceRef.current = nonce
+    const url = new URL('/widget-login', window.location.origin)
+    url.searchParams.set('state', nonce)
+    const popup = window.open(
+      url.href,
+      'ascs-widget-login',
+      'popup,width=480,height=640',
+    )
+    if (!popup) {
+      setLoginError('浏览器阻止了登录窗口，请允许弹出窗口后重试。')
+      return
+    }
+    popupRef.current = popup
+  }, [])
+  return (
+    <Widget
+      options={options}
+      session={widgetSession}
+      loginError={loginError}
+      onLogin={openLogin}
+      onSignOut={async () => {
+        let warning: string | null = null
+        try {
+          await api('widget/session', { method: 'DELETE', body: {} })
+        } catch {
+          warning = '退出请求未送达，已在本地退出。'
+        }
+        clearWidgetToken()
+        setToken(null)
+        resetAuthCaches(queryClient)
+        return warning
+      }}
+    />
+  )
+}
+
+function Widget({
+  options,
+  session,
+  onLogin,
+  onSignOut,
+  loginError = '',
+}: {
+  options: WidgetOptions
+  session: WidgetSession
+  onLogin: () => void
+  onSignOut: () => Promise<string | null>
+  loginError?: string
+}) {
   const queryClient = useQueryClient()
   const config = useQuery({
     queryKey: queryKeys.widgetConfig(
       options.siteId,
       options.pageUrl,
       options.pageKey,
+      options.theme,
+      options.accent,
     ),
     queryFn: ({ signal }) =>
       api<Config>(`config?${queryString(options)}`, { signal }),
     staleTime: staleTimes.static,
   })
-  const embedded = typeof window !== 'undefined' && window.parent !== window
-  const [token, setToken] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : getWidgetToken(),
-  )
-  const cookieSession = authClient.useSession()
-  const widgetSession = useWidgetSession(embedded ? token : null)
-  const session = embedded
-    ? {
-        data: widgetSession.data,
-        isPending: widgetSession.isPending,
-        refetch: widgetSession.refetch,
-      }
-    : cookieSession
-  const [authOpen, setAuthOpen] = useState(false)
-  const popupRef = useRef<Window | null>(null)
-  const nonceRef = useRef('')
   const [reply, setReply] = useState<{ id: string; author: string } | null>(
     null,
   )
@@ -99,54 +212,6 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
   useEffect(() => {
     replyRef.current = reply
   }, [reply])
-  useEffect(() => {
-    if (!embedded) return
-    const listener = (event: MessageEvent) => {
-      if (
-        event.origin !== window.location.origin ||
-        event.source !== popupRef.current ||
-        !event.data ||
-        event.data.type !== 'ascs:widget-session' ||
-        event.data.state !== nonceRef.current ||
-        typeof event.data.token !== 'string' ||
-        !event.data.token
-      )
-        return
-      setWidgetToken(event.data.token)
-      setToken(event.data.token)
-      popupRef.current?.close()
-      popupRef.current = null
-      setAuthOpen(false)
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.widgetSession,
-      })
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.comments(options.siteId),
-      })
-    }
-    window.addEventListener('message', listener)
-    return () => window.removeEventListener('message', listener)
-  }, [embedded, queryClient, options.siteId])
-  function openLogin() {
-    if (!embedded) {
-      setAuthOpen(true)
-      return
-    }
-    const nonce = crypto.randomUUID()
-    nonceRef.current = nonce
-    const url = new URL('/widget-login', window.location.origin)
-    url.searchParams.set('state', nonce)
-    const popup = window.open(
-      url.href,
-      'ascs-widget-login',
-      'popup,width=480,height=640',
-    )
-    if (!popup) {
-      setError('浏览器阻止了登录窗口，请允许弹出窗口后重试。')
-      return
-    }
-    popupRef.current = popup
-  }
   const theme = options.theme || config.data?.theme || 'auto'
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -181,9 +246,6 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
     notify()
     return () => observer.disconnect()
   }, [options.siteId, options.pageUrl])
-  useEffect(() => {
-    if (session.data) setAuthOpen(false)
-  }, [session.data])
   const list = useQuery({
     queryKey: queryKeys.commentList({
       siteId: options.siteId,
@@ -304,27 +366,15 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
               title="退出登录"
               className="shrink-0"
               onClick={async () => {
-                if (embedded) {
-                  try {
-                    await api('widget/session', { method: 'DELETE', body: {} })
-                  } catch {
-                    setError('退出请求未送达，已在本地退出。')
-                  }
-                  clearWidgetToken()
-                  setToken(null)
-                  resetAuthCaches(queryClient)
-                  return
-                }
-                const result = await authClient.signOut()
-                if (result.error) setError(result.error.message || '退出失败')
-                else resetAuthCaches(queryClient)
+                const warning = await onSignOut()
+                if (warning) setError(warning)
               }}
             >
               <SignOutIcon size={17} />
             </Button>
           </div>
         ) : (
-          <Button icon={SignInIcon} onClick={openLogin}>
+          <Button icon={SignInIcon} onClick={onLogin}>
             登录
           </Button>
         )}
@@ -334,145 +384,32 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
           <ChatCircleIcon size={30} aria-hidden="true" />
           <div className="empty-copy">
             <p>此站点需要登录后发表评论。</p>
-            <Button onClick={openLogin}>登录后评论</Button>
+            <Button onClick={onLogin}>登录后评论</Button>
           </div>
         </div>
       ) : (
-        <form
-          className="comment-form"
-          onSubmit={(event) => {
-            event.preventDefault()
+        <CommentComposer
+          options={options}
+          session={session}
+          challenge={config.data.challenge}
+          formDisabled={formDisabled}
+          send={send}
+          reply={reply}
+          setReply={setReply}
+          text={text}
+          setText={setText}
+          preview={preview}
+          setPreview={setPreview}
+          editorRef={editorRef}
+          onSubmitStart={() => {
             setNotice('')
             setError('')
-            const form = new FormData(event.currentTarget)
-            send.mutate({
-              ...options,
-              theme: undefined,
-              accent: undefined,
-              parentId: reply?.id,
-              body: text,
-              author: session.data ? undefined : String(form.get('author')),
-              email: session.data ? undefined : String(form.get('email')),
-              website: String(form.get('website') || ''),
-              challenge: config.data.challenge,
-            })
           }}
-        >
-          {reply && (
-            <div className="reply-target">
-              <span className="h-lh flex items-center shrink-0">
-                <ArrowBendUpLeftIcon size={16} aria-hidden="true" />
-              </span>
-              <span className="break-words">回复 {reply.author}</span>
-              <Button
-                type="button"
-                shape="square"
-                variant="ghost"
-                aria-label="取消回复"
-                title="取消回复"
-                disabled={formDisabled}
-                onClick={() => setReply(null)}
-              >
-                <XIcon size={16} />
-              </Button>
-            </div>
-          )}
-          {!session.data && (
-            <>
-              <div className="anonymous-fields">
-                <Input
-                  label="昵称"
-                  name="author"
-                  required
-                  maxLength={60}
-                  autoComplete="nickname"
-                  disabled={formDisabled}
-                />
-                <Input
-                  label="邮箱（不公开）"
-                  name="email"
-                  type="email"
-                  required
-                  maxLength={254}
-                  autoComplete="email"
-                  disabled={formDisabled}
-                />
-              </div>
-              <p className="anonymous-hint text-muted">
-                邮箱仅用于接收回复通知和防止重复提交，不会展示给其他人。
-              </p>
-            </>
-          )}
-          <label className="sr-only" htmlFor="comment-text">
-            评论内容
-          </label>
-          {preview ? (
-            <div
-              className="preview"
-              role="region"
-              tabIndex={0}
-              aria-label="评论预览"
-            >
-              <Markdown>{text || ' '}</Markdown>
-            </div>
-          ) : (
-            <textarea
-              ref={editorRef}
-              id="comment-text"
-              name="body"
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              required
-              maxLength={5000}
-              rows={5}
-              placeholder="写下你的评论…"
-              disabled={formDisabled}
-              aria-describedby="comment-help"
-            />
-          )}
-          <div className="honeypot" aria-hidden="true">
-            <label htmlFor="website">Website</label>
-            <input
-              id="website"
-              name="website"
-              tabIndex={-1}
-              autoComplete="off"
-            />
-          </div>
-          <div className="composer-footer">
-            <div className="composer-help">
-              <span id="comment-help" className="text-muted">
-                支持 Markdown · {text.length}/5000
-              </span>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                shape="square"
-                aria-label={preview ? '编辑评论' : '预览评论'}
-                title={preview ? '编辑评论' : '预览评论'}
-                aria-pressed={preview}
-                disabled={formDisabled}
-                onClick={() => setPreview(!preview)}
-              >
-                <EyeIcon size={17} />
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                icon={ArrowRightIcon}
-                disabled={!text.trim() || formDisabled}
-                loading={send.isPending}
-              >
-                发布评论
-              </Button>
-            </div>
-          </div>
-        </form>
+        />
       )}
-      {(send.error || error) && (
+      {(send.error || error || loginError) && (
         <p role="alert" className="error-box mt-3">
-          {error || errorText(send.error)}
+          {error || loginError || errorText(send.error)}
         </p>
       )}
       {notice && (
@@ -554,179 +491,6 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
           ASCS
         </a>
       </footer>
-      <AppDialog
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        title="登录 ASCS"
-        description="登录后可以使用账号发表评论、回复和点赞。"
-      >
-        <AuthForm compact inFrame={embedded} />
-      </AppDialog>
     </main>
-  )
-}
-
-function Thread({
-  comment,
-  options,
-  sort,
-  expandPath,
-  onReply,
-}: {
-  comment: CommentList['items'][number]
-  options: WidgetOptions
-  sort: 'newest' | 'oldest' | 'popular'
-  expandPath: string[]
-  onReply: (comment: { id: string; author: string }) => void
-}) {
-  const queryClient = useQueryClient()
-  const [expanded, setExpanded] = useState(false)
-  const [page, setPage] = useState(1)
-  const [liked, setLiked] = useState(comment.liked)
-  const [likes, setLikes] = useState(comment.likes)
-  useEffect(() => setLiked(comment.liked), [comment.liked])
-  useEffect(() => setLikes(comment.likes), [comment.likes])
-  useEffect(() => {
-    if (expandPath.includes(comment.id)) setExpanded(true)
-  }, [comment.id, expandPath])
-  const replies = useQuery({
-    queryKey: queryKeys.commentList({
-      siteId: options.siteId,
-      pageUrl: options.pageUrl,
-      pageKey: options.pageKey,
-      parentId: comment.id,
-      sort,
-      page,
-    }),
-    queryFn: ({ signal }) =>
-      api<CommentList>(
-        `comments?${queryString({ ...options, parentId: comment.id, sort, page })}`,
-        { signal },
-      ),
-    enabled: expanded,
-  })
-  const like = useMutation({
-    mutationFn: () =>
-      api<{ liked: boolean }>('likes', {
-        method: 'POST',
-        body: { ...options, commentId: comment.id },
-      }),
-    onMutate: () => {
-      const previous = { liked, likes }
-      const next = !liked
-      setLiked(next)
-      setLikes(Math.max(0, likes + (next ? 1 : -1)))
-      return previous
-    },
-    onError: (_error, _variables, previous) => {
-      if (previous) {
-        setLiked(previous.liked)
-        setLikes(previous.likes)
-      }
-    },
-    onSuccess: async (result) => {
-      setLiked(result.liked)
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.comments(options.siteId),
-      })
-    },
-  })
-  return (
-    <article className="thread">
-      <div className="thread-main">
-        <Avatar name={comment.author} image={comment.image} />
-        <div className="min-w-0 flex-1">
-          <div className="comment-meta">
-            {comment.website &&
-            profileUrl.safeParse(comment.website).success ? (
-              <a
-                href={comment.website}
-                target="_blank"
-                rel="nofollow noopener noreferrer ugc"
-                className="text-link break-words font-medium"
-              >
-                {comment.author}
-              </a>
-            ) : (
-              <strong className="break-words">{comment.author}</strong>
-            )}
-            <time>
-              {new Date(comment.createdAt).toLocaleDateString('zh-CN')}
-            </time>
-          </div>
-          {comment.status === 'deleted' ? (
-            <p className="text-muted py-2">评论已删除</p>
-          ) : (
-            <Markdown>{comment.body}</Markdown>
-          )}
-          <div className="thread-actions">
-            {comment.status !== 'deleted' && (
-              <>
-                <Button
-                  variant="ghost"
-                  aria-label={liked ? '取消点赞' : '点赞'}
-                  aria-pressed={liked}
-                  loading={like.isPending}
-                  onClick={() => like.mutate()}
-                >
-                  <HeartIcon size={16} weight={liked ? 'fill' : 'regular'} />
-                  {likes}
-                </Button>
-                {comment.depth < 4 && (
-                  <Button
-                    variant="ghost"
-                    icon={ArrowBendUpLeftIcon}
-                    onClick={() => onReply(comment)}
-                  >
-                    回复
-                  </Button>
-                )}
-              </>
-            )}
-            {comment.replies > 0 && (
-              <Button
-                variant="ghost"
-                onClick={() => setExpanded(!expanded)}
-                aria-expanded={expanded}
-              >
-                {expanded ? '收起回复' : `${comment.replies} 条回复`}
-              </Button>
-            )}
-          </div>
-          {like.error && (
-            <p role="alert" className="error-box">
-              {errorText(like.error)}
-            </p>
-          )}
-        </div>
-      </div>
-      {expanded && (
-        <div className="replies">
-          {replies.isPending ? (
-            <p role="status">正在加载回复…</p>
-          ) : replies.error ? (
-            <QueryError error={replies.error} retry={replies.refetch} />
-          ) : (
-            replies.data.items.map((reply) => (
-              <Thread
-                key={reply.id}
-                comment={reply}
-                options={options}
-                sort={sort}
-                expandPath={expandPath}
-                onReply={onReply}
-              />
-            ))
-          )}
-          <Pagination
-            page={page}
-            setPage={setPage}
-            hasMore={!!replies.data?.hasMore}
-            loading={replies.isFetching}
-            totalPages={replies.data?.totalPages}
-          />
-        </div>
-      )}
-    </article>
   )
 }

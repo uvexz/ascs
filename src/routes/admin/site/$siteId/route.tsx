@@ -20,7 +20,7 @@ export const Route = createFileRoute('/admin/site/$siteId')({
   loader: async ({ params, context }) => {
     try {
       await Promise.all([
-        context.queryClient.fetchQuery(dashboardQuery(params.siteId)),
+        context.queryClient.fetchQuery(dashboardQuery()),
         context.queryClient.fetchQuery(siteDetailQuery(params.siteId)),
       ])
     } catch (error) {

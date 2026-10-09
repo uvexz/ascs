@@ -1,11 +1,17 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Button, Input } from '@cloudflare/kumo'
-import { api, errorText } from '../../lib/api'
+import { Button } from '@cloudflare/kumo'
+import { api } from '../../lib/api'
 import { LocalTime } from '../local-time'
-import { AppDialog, QueryError } from '../ui'
+import { QueryError } from '../ui'
 import { Filters } from './filters'
 import { ListPagination, useAdminRefresh, useList } from './shared'
+import {
+  CreateUserDialog,
+  DeleteUserDialog,
+  EditUserDialog,
+  RevokeSessionsDialog,
+} from './user-dialogs'
 import type { UserCreate, UserUpdate } from '../../lib/system-settings'
 import type { InstanceUsers } from '../../server/admin.server'
 
@@ -156,215 +162,33 @@ export function Users({ actorId }: { actorId: string }) {
         </>
       )}
       <ListPagination list={list} />
-      <AppDialog
+      <CreateUserDialog
         open={creating}
         onOpenChange={setCreating}
-        title="创建用户"
-        description="注册关闭时管理员仍可创建账号。请通过可信渠道告知用户初始密码。"
-        busy={create.isPending}
-      >
-        <form
-          key={String(creating)}
-          className="grid gap-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            create.mutate({
-              name: String(form.get('name')),
-              email: String(form.get('email')),
-              password: String(form.get('password')),
-              siteLimit: Number(form.get('siteLimit')),
-              admin: form.get('admin') === 'on',
-              disabled: false,
-            })
-          }}
-        >
-          <fieldset disabled={create.isPending} className="grid gap-4">
-            <Input label="昵称" name="name" required maxLength={60} />
-            <Input
-              label="邮箱"
-              name="email"
-              type="email"
-              required
-              maxLength={254}
-            />
-            <Input
-              label="初始密码"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              minLength={10}
-              maxLength={128}
-            />
-            <Input
-              label="站点额度"
-              name="siteLimit"
-              type="number"
-              defaultValue={0}
-              required
-              min={0}
-              max={10000}
-            />
-            <label className="checkbox-label">
-              <input type="checkbox" name="admin" />
-              实例管理员
-            </label>
-          </fieldset>
-          {create.error && (
-            <p role="alert" className="error-box">
-              {errorText(create.error)}
-            </p>
-          )}
-          <Button type="submit" variant="primary" loading={create.isPending}>
-            创建用户
-          </Button>
-        </form>
-      </AppDialog>
-      <AppDialog
-        open={!!deleteTarget}
+        create={create}
+      />
+      <DeleteUserDialog
+        target={deleteTarget}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
         }}
-        title="删除用户？"
-        description={`将永久删除 ${deleteTarget?.email || ''} 的账号、登录和成员关系。历史评论保留并匿名化；拥有站点的用户必须先转移站点。`}
-        busy={remove.isPending}
-        alert
-      >
-        <form
-          onSubmit={(event) => {
-            event.preventDefault()
-            const form = new FormData(event.currentTarget)
-            if (deleteTarget && form.get('confirmation') === deleteTarget.email)
-              remove.mutate(deleteTarget.id)
-          }}
-          className="grid gap-4"
-        >
-          <Input
-            key={deleteTarget?.id}
-            label="输入用户邮箱确认删除"
-            name="confirmation"
-            type="email"
-            required
-            autoComplete="off"
-            onChange={(event) =>
-              event.currentTarget.setCustomValidity(
-                event.currentTarget.value === deleteTarget?.email
-                  ? ''
-                  : '请输入待删除用户的邮箱',
-              )
-            }
-          />
-          {remove.error && (
-            <p role="alert" className="error-box">
-              {errorText(remove.error)}
-            </p>
-          )}
-          <Button
-            type="submit"
-            variant="destructive"
-            loading={remove.isPending}
-          >
-            永久删除用户
-          </Button>
-        </form>
-      </AppDialog>
-      <AppDialog
-        open={!!selected}
+        remove={remove}
+      />
+      <EditUserDialog
+        target={selected}
+        actorId={actorId}
         onOpenChange={(open) => {
           if (!open) setSelected(null)
         }}
-        title="编辑用户"
-        description={selected?.email || ''}
-        busy={change.isPending}
-      >
-        <form
-          key={selected?.id}
-          className="grid gap-4"
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (!selected) return
-            const form = new FormData(event.currentTarget)
-            change.mutate({
-              id: selected.id,
-              input: {
-                name: String(form.get('name')),
-                siteLimit: Number(form.get('siteLimit')),
-                disabled: form.get('disabled') === 'on',
-                admin: selected.id === actorId || form.get('admin') === 'on',
-              },
-            })
-          }}
-        >
-          <fieldset disabled={change.isPending} className="grid gap-4">
-            <Input
-              label="昵称"
-              name="name"
-              defaultValue={selected?.name}
-              required
-              maxLength={60}
-            />
-            <Input
-              label="站点额度"
-              name="siteLimit"
-              type="number"
-              defaultValue={selected?.siteLimit}
-              min={0}
-              max={10000}
-              required
-            />
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="admin"
-                defaultChecked={selected?.admin}
-                disabled={selected?.id === actorId}
-              />
-              实例管理员
-            </label>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name="disabled"
-                defaultChecked={selected?.disabled}
-                disabled={selected?.id === actorId}
-              />
-              停用账号（立即撤销登录，禁止登录和发表评论）
-            </label>
-          </fieldset>
-          {change.error && (
-            <p role="alert" className="error-box">
-              {errorText(change.error)}
-            </p>
-          )}
-          <Button type="submit" variant="primary" loading={change.isPending}>
-            保存用户
-          </Button>
-        </form>
-      </AppDialog>
-      <AppDialog
-        open={!!revoke}
+        change={change}
+      />
+      <RevokeSessionsDialog
+        target={revoke}
         onOpenChange={(open) => {
           if (!open) setRevoke(null)
         }}
-        title="撤销所有登录？"
-        description={`${revoke?.name || ''} 的所有设备都需要重新登录。`}
-        busy={sessions.isPending}
-        alert
-      >
-        {sessions.error && (
-          <p role="alert" className="error-box mb-4">
-            {errorText(sessions.error)}
-          </p>
-        )}
-        <Button
-          variant="destructive"
-          loading={sessions.isPending}
-          onClick={() => revoke && sessions.mutate(revoke.id)}
-        >
-          撤销登录
-        </Button>
-      </AppDialog>
+        sessions={sessions}
+      />
     </>
   )
 }

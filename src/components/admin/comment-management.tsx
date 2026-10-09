@@ -11,9 +11,11 @@ import {
 import { api, errorText, queryString } from '../../lib/api'
 import { invalidateSiteCaches } from '../../lib/cache'
 import { queryKeys } from '../../lib/query-keys'
+import { profileUrl } from '../../lib/validation'
 import { Avatar } from '../avatar'
 import { LocalTime } from '../local-time'
-import { AppDialog, QueryError } from '../ui'
+import { QueryError } from '../ui'
+import { BanCommenterDialog, DeleteCommentDialog } from './comment-dialogs'
 import { Markdown } from '../markdown'
 import { Pagination } from '../pagination'
 import { StatsStrip } from './stats-strip'
@@ -180,14 +182,18 @@ export function CommentManagement({
                   </span>
                   <LocalTime value={comment.createdAt} />
                 </div>
-                <a
-                  className="article-link"
-                  href={comment.pageUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {new URL(comment.pageUrl).pathname || '/'}
-                </a>
+                {profileUrl.safeParse(comment.pageUrl).success ? (
+                  <a
+                    className="article-link"
+                    href={comment.pageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {new URL(comment.pageUrl).pathname || '/'}
+                  </a>
+                ) : (
+                  <span className="article-link">{comment.pageUrl}</span>
+                )}
                 {comment.parentAuthor && (
                   <div className="parent-context">
                     <span>回复 {comment.parentAuthor}</span>
@@ -291,104 +297,17 @@ export function CommentManagement({
         loading={list.isFetching}
         totalPages={list.data?.totalPages}
       />
-      <AppDialog
-        open={!!deleteId}
-        onOpenChange={(open) => {
-          if (!open && !moderate.isPending) setDeleteId(null)
-        }}
-        title="删除评论？"
-        description="内容和身份信息将永久清除，嵌套回复会保留。"
-        alert
-        busy={moderate.isPending}
-      >
-        <div>
-          {moderate.error && (
-            <p role="alert" className="error-box mb-4">
-              {errorText(moderate.error)}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button
-              onClick={() => setDeleteId(null)}
-              disabled={moderate.isPending}
-            >
-              取消
-            </Button>
-            <Button
-              variant="destructive"
-              icon={TrashIcon}
-              loading={moderate.isPending}
-              onClick={() =>
-                deleteId &&
-                moderate.mutate({ commentId: deleteId, status: 'deleted' })
-              }
-            >
-              删除
-            </Button>
-          </div>
-        </div>
-      </AppDialog>
-      <AppDialog
-        open={!!banTarget}
-        onOpenChange={(open) => {
-          if (!open && !ban.isPending) setBanTarget(null)
-        }}
-        title="封禁评论者"
-        description={
-          banTarget
-            ? `当前评论者：${banTarget.author}。仅影响当前站点，不会自动删除历史评论。`
-            : ''
-        }
-        busy={ban.isPending}
-      >
-        <div>
-          {ban.error && (
-            <p role="alert" className="error-box mb-4">
-              {errorText(ban.error)}
-            </p>
-          )}
-          <div className="grid gap-3">
-            <Button
-              disabled={ban.isPending || !banTarget?.userId}
-              onClick={() =>
-                banTarget &&
-                ban.mutate({ commentId: banTarget.id, kind: 'user' })
-              }
-            >
-              封禁账号
-            </Button>
-            <Button
-              disabled={ban.isPending || !banTarget?.hasEmail}
-              onClick={() =>
-                banTarget &&
-                ban.mutate({ commentId: banTarget.id, kind: 'email' })
-              }
-            >
-              封禁邮箱
-            </Button>
-            <Button
-              disabled={ban.isPending || !detail.canBanIp || !banTarget?.hasIp}
-              onClick={() =>
-                banTarget && ban.mutate({ commentId: banTarget.id, kind: 'ip' })
-              }
-            >
-              封禁 IP
-            </Button>
-            {!detail.canBanIp && (
-              <p className="text-muted">
-                当前服务未配置可信 IP 来源，无法安全区分不同评论者的 IP。
-              </p>
-            )}
-            <Button
-              variant="ghost"
-              onClick={() => setBanTarget(null)}
-              disabled={ban.isPending}
-            >
-              取消
-            </Button>
-          </div>
-        </div>
-      </AppDialog>
+      <DeleteCommentDialog
+        commentId={deleteId}
+        onClose={() => setDeleteId(null)}
+        moderate={moderate}
+      />
+      <BanCommenterDialog
+        target={banTarget}
+        canBanIp={detail.canBanIp}
+        onClose={() => setBanTarget(null)}
+        ban={ban}
+      />
     </>
   )
 }

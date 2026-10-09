@@ -1,8 +1,8 @@
-import { Component, useEffect, useRef } from 'react'
+import { Component } from 'react'
 import { Button, Dialog } from '@cloudflare/kumo'
 import { XIcon } from '@phosphor-icons/react'
 import { ApiError, errorText } from '../lib/api'
-import type { ErrorInfo, ReactNode, RefObject } from 'react'
+import type { ErrorInfo, ReactNode } from 'react'
 
 export class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -47,7 +47,6 @@ export function AppDialog({
   children,
   busy = false,
   alert = false,
-  returnFocus,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -56,16 +55,7 @@ export function AppDialog({
   children: ReactNode
   busy?: boolean
   alert?: boolean
-  returnFocus?: RefObject<HTMLElement | null>
 }) {
-  const wasOpen = useRef(false)
-  useEffect(() => {
-    if (wasOpen.current && !open)
-      requestAnimationFrame(() => {
-        if (returnFocus?.current?.isConnected) returnFocus.current.focus()
-      })
-    wasOpen.current = open
-  }, [open, returnFocus])
   return (
     <Dialog.Root
       open={open}

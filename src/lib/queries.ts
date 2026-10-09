@@ -39,19 +39,19 @@ function unwrap<T>(result: Result<T>): T {
   return result.data
 }
 
-const fetchDashboard = createServerFn({ method: 'GET' })
-  .validator((input: { siteId?: string } | undefined) => input ?? {})
-  .handler(async ({ data }): Promise<Result<Dashboard>> => {
+const fetchDashboard = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<Result<Dashboard>> => {
     try {
       const [{ dashboard }, { getRequest }] = await Promise.all([
         import('../server/api.server'),
         import('@tanstack/react-start/server'),
       ])
-      return { ok: true, data: await dashboard(getRequest(), data.siteId) }
+      return { ok: true, data: await dashboard(getRequest()) }
     } catch (error) {
       return toResult(error)
     }
-  })
+  },
+)
 
 const fetchSiteDetail = createServerFn({ method: 'GET' })
   .validator((input: { siteId: string }) => input)
@@ -99,10 +99,10 @@ export const fetchSession = createServerFn({ method: 'GET' }).handler(
   },
 )
 
-export const dashboardQuery = (siteId?: string) =>
+export const dashboardQuery = () =>
   queryOptions({
-    queryKey: queryKeys.dashboard(siteId),
-    queryFn: () => fetchDashboard({ data: { siteId } }).then(unwrap),
+    queryKey: queryKeys.dashboard(),
+    queryFn: () => fetchDashboard().then(unwrap),
   })
 
 export const siteDetailQuery = (siteId: string) =>
@@ -111,8 +111,8 @@ export const siteDetailQuery = (siteId: string) =>
     queryFn: () => fetchSiteDetail({ data: { siteId } }).then(unwrap),
   })
 
-export const profileQuery = (userId?: string) =>
+export const profileQuery = () =>
   queryOptions({
-    queryKey: queryKeys.profile(userId),
+    queryKey: queryKeys.profile(),
     queryFn: () => fetchProfile().then(unwrap),
   })

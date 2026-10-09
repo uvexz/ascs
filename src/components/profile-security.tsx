@@ -1,34 +1,24 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
-import {
-  GithubLogoIcon,
-  GoogleLogoIcon,
-  SquaresFourIcon,
-} from '@phosphor-icons/react'
 import { api, errorText, fieldError } from '../lib/api'
 import { authClient } from '../lib/auth-client'
 import { queryKeys, staleTimes } from '../lib/query-keys'
+import { AUTH_PROVIDERS } from './auth-providers'
 import { AppDialog, QueryError } from './ui'
+import type { AuthProviderId } from './auth-providers'
 import type { ProfileAccounts } from '../server/profile.server'
-
-const PROVIDERS = [
-  { id: 'github', name: 'GitHub', Icon: GithubLogoIcon },
-  { id: 'google', name: 'Google', Icon: GoogleLogoIcon },
-  { id: 'microsoft', name: 'Microsoft', Icon: SquaresFourIcon },
-] as const
-type ProviderId = (typeof PROVIDERS)[number]['id']
 
 type AuthConfig = { github: boolean; google: boolean; microsoft: boolean }
 
 export function ProfileSecurity({ email }: { email: string }) {
   const queryClient = useQueryClient()
-  const [busy, setBusy] = useState<ProviderId | null>(null)
+  const [busy, setBusy] = useState<AuthProviderId | null>(null)
   const [bindError, setBindError] = useState<unknown>(null)
   const [unlinkError, setUnlinkError] = useState<unknown>(null)
   const [unlinkTarget, setUnlinkTarget] = useState<{
     id: string
-    providerId: ProviderId
+    providerId: AuthProviderId
   } | null>(null)
   const [newEmail, setNewEmail] = useState('')
   const [notice, setNotice] = useState('')
@@ -51,11 +41,13 @@ export function ProfileSecurity({ email }: { email: string }) {
       setNewEmail('')
     },
   })
-  const providers = PROVIDERS.filter((provider) => config.data?.[provider.id])
+  const providers = AUTH_PROVIDERS.filter(
+    (provider) => config.data?.[provider.id],
+  )
   const linked = (accounts.data?.accounts || []).filter(
     (item) => item.providerId !== 'credential',
   )
-  async function bind(provider: ProviderId) {
+  async function bind(provider: AuthProviderId) {
     setBusy(provider)
     setBindError(null)
     try {
@@ -228,7 +220,7 @@ export function ProfileSecurity({ email }: { email: string }) {
         description={
           unlinkTarget
             ? `解绑后将无法再用 ${
-                PROVIDERS.find(
+                AUTH_PROVIDERS.find(
                   (provider) => provider.id === unlinkTarget.providerId,
                 )?.name || '该账号'
               } 登录。`
