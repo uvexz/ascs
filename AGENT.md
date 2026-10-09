@@ -30,6 +30,7 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 | `src/lib/auth-client.ts`            | 浏览器认证客户端                                             |
 | `src/lib/validation.ts`             | Zod 输入校验、共享枚举和分页常量                             |
 | `src/lib/api.ts`                    | 浏览器 fetch、错误类型、查询参数编码                         |
+| `src/lib/widget-session.ts`         | 跨站 iframe 的短期会话令牌存储与查询                         |
 | `src/lib/cache.ts`                  | TanStack Query 缓存失效 helper                               |
 | `src/lib/system-settings.ts`        | 系统设置的类型、默认值和 Zod schema                          |
 | `src/server/security.server.ts`     | session、站点授权、来源检查、HMAC、原子限流、challenge       |
@@ -98,6 +99,7 @@ bun run start
 - 实例管理员可不限额度创建站点，普通用户只能在账号 `siteLimit` 范围内创建；所有权转移同样检查新所有者额度。站点所有者管理配置、验证和成员；审核员只能进行获授权的站点操作。
 - 对评论执行审核、删除、封禁或点赞时，数据库条件必须同时约束资源 ID 和站点归属；公共评论操作还须校验文章标识。
 - 不允许普通用户通过注册、客户端字段或未认证的初始化接口成为管理员。
+- 跨站评论凭据只能由服务端在验证 cookie 会话后签发，短有效期、随会话撤销，且仅适用于公开评论接口；后台和个人资料接口必须拒绝该凭据（`requireSession` 拒绝带 bearer 的请求）。
 - 初始化已有管理员账号时必须验证密码，不能只凭邮箱直接提权。
 - 不要关闭 Better Auth 的 CSRF、来源检查或 cookie 安全保护。OAuth provider credentials 必须仅留在服务端。
 
@@ -128,7 +130,7 @@ bun run start
 - 用户链接维持安全 URL 处理以及 `nofollow noopener noreferrer ugc`；评论图片默认不加载，以避免跟踪。
 - 管理页面禁止 iframe 嵌入。widget 的 CSP `frame-ancestors` 仅允许对应已验证站点和自身。
 - `postMessage` 必须检查 `origin`、`source`、消息类型、站点 ID 和高度范围；禁止宽泛使用 `*` 作为消息目标。
-- 保持 iframe sandbox。跨站浏览器可能阻止第三方 cookie，登录流程需允许在服务域名的顶层窗口完成；不要为兼容性关闭 CSRF 或全局放宽 cookie。
+- 保持 iframe sandbox。跨站 iframe 读不到 SameSite=Lax 的会话 cookie，登录必须在服务域名的顶层窗口完成（`/widget-login`），再由服务端签发短期会话凭据经 `postMessage` 回传，iframe 以 `Authorization: Bearer` 调用公开接口；不要为兼容性关闭 CSRF 或全局放宽 cookie。回传前必须校验 `window.opener` 同源，接收端必须校验 `origin`、`source`、消息类型与 nonce。
 
 ## 代码和 UI 约定
 
@@ -168,7 +170,7 @@ bun run start
 - 尚未完成截图和真实 UI 验证，不能声称 UI 或 E2E 验收已通过。
 - Docker 实际构建运行、Vercel 远程部署、真实 DNS 验证、Turso 远程连接、SMTP 实际送达和真实 OAuth provider 登录尚未完成验收。
 - 初始 Vercel 配置需要验证 Nitro preset 产物和 cron 授权行为。
-- 邮件失败运维、实例管理员管理 UI、系统设置和实例操作日志已实现。跨站 OAuth/第三方 cookie 兼容性、完整 CSP、真实 SMTP 外部连接和 UI 浏览器验收仍需验证。
+- 邮件失败运维、实例管理员管理 UI、系统设置和实例操作日志已实现。跨站登录已实现顶层握手与短期 bearer 凭据，但真实浏览器的第三方 cookie/存储拦截行为、完整 CSP、真实 SMTP 外部连接和 UI 浏览器验收仍需验证。
 
 接续时先解决会影响安全、真实业务和部署的缺口，再进行外观调整；验证报告明确区分通过、失败、未执行和受环境阻塞的项目。
 

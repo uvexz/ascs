@@ -69,7 +69,7 @@ bun run dev
 ></script>
 ```
 
-可选属性：`data-url` 覆盖文章 URL，`data-page` 使用不会随 URL 改名的稳定文章 ID，`data-accent` 使用 6 位十六进制品牌色。脚本本身约 2 KB，评论 UI 运行在 sandbox iframe 中，博客 CSS 不会污染评论区。首次嵌入前，在后台复制验证 TXT 记录到 `_ascs.<域名>`，再点击“检查验证”。
+可选属性：`data-url` 覆盖文章 URL，`data-page` 使用不会随 URL 改名的稳定文章 ID，`data-accent` 使用 6 位十六进制品牌色。脚本本身约 2 KB，评论 UI 运行在 sandbox iframe 中，博客 CSS 不会污染评论区。登录时会在服务域名打开顶层弹窗完成认证，成功后自动回到文章页；博客页面无法读取该凭据。首次嵌入前，在后台复制验证 TXT 记录到 `_ascs.<域名>`，再点击“检查验证”。
 
 文章 URL 必须和站点 origin 完全匹配；服务端会重新规范化 URL、校验站点归属和文章标识，不信任脚本传入的权限或用户 ID。
 
@@ -88,6 +88,8 @@ bun run dev
 - `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`：仅 `admin:init` 使用的一次性管理员初始化变量
 
 认证 cookie 使用 HttpOnly、SameSite=Lax；生产环境从 HTTPS URL 自动使用安全 cookie。Better Auth 的表和 ASCS 业务表由同一次 Drizzle 迁移创建。
+
+评论区嵌入在其它域名的页面时，浏览器不会在第三方 iframe 中发送该 cookie（Safari 等还会直接拦截第三方 cookie）。为此，评论区登录会在服务域名的顶层弹窗中完成，再由服务端签发一个 12 小时、可撤销的短期会话凭据，通过 `postMessage` 回传给 iframe；iframe 仅凭该凭据调用公开评论接口。Cookie 属性保持不变，未放宽 SameSite 或 CSRF 保护。
 
 ## 部署
 

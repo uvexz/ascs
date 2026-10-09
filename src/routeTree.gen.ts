@@ -15,6 +15,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as TosRouteImport } from './routes/tos'
 import { Route as WidgetRouteImport } from './routes/widget'
+import { Route as WidgetLoginRouteImport } from './routes/widget-login'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiV1SplatRouteImport } from './routes/api/v1/$'
 
@@ -48,6 +49,11 @@ const WidgetRoute = WidgetRouteImport.update({
   path: '/widget',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WidgetLoginRoute = WidgetLoginRouteImport.update({
+  id: '/widget-login',
+  path: '/widget-login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/tos': typeof TosRoute
   '/widget': typeof WidgetRoute
+  '/widget-login': typeof WidgetLoginRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/tos': typeof TosRoute
   '/widget': typeof WidgetRoute
+  '/widget-login': typeof WidgetLoginRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/tos': typeof TosRoute
   '/widget': typeof WidgetRoute
+  '/widget-login': typeof WidgetLoginRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/v1/$': typeof ApiV1SplatRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/tos'
     | '/widget'
+    | '/widget-login'
     | '/api/auth/$'
     | '/api/v1/$'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/tos'
     | '/widget'
+    | '/widget-login'
     | '/api/auth/$'
     | '/api/v1/$'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/tos'
     | '/widget'
+    | '/widget-login'
     | '/api/auth/$'
     | '/api/v1/$'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   TosRoute: typeof TosRoute
   WidgetRoute: typeof WidgetRoute
+  WidgetLoginRoute: typeof WidgetLoginRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiV1SplatRoute: typeof ApiV1SplatRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WidgetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/widget-login': {
+      id: '/widget-login'
+      path: '/widget-login'
+      fullPath: '/widget-login'
+      preLoaderRoute: typeof WidgetLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   TosRoute: TosRoute,
   WidgetRoute: WidgetRoute,
+  WidgetLoginRoute: WidgetLoginRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiV1SplatRoute: ApiV1SplatRoute,
 }

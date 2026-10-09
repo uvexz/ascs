@@ -28,6 +28,7 @@ import {
 import {
   authorize,
   baseOrigin,
+  bearerToken,
   challenge,
   check,
   digest,
@@ -36,8 +37,10 @@ import {
   ipHash,
   isAdmin,
   limit,
+  mintWidgetSession,
   requireOrigin,
   requireSession,
+  revokeWidgetSession,
   secureEqual,
   verifyChallenge,
   voterIdentity,
@@ -955,6 +958,37 @@ export async function handleApi(request: Request) {
         })
       })
       return json({ id: siteId }, 201)
+    }
+    if (path[0] === 'widget' && path[1] === 'session') {
+      if (request.method === 'GET') {
+        const session = await getSession(request)
+        check(session, 401, '请先登录')
+        return json({
+          user: {
+            id: session.user.id,
+            name: session.user.name,
+            image: session.user.image,
+          },
+        })
+      }
+      if (request.method === 'POST') {
+        const { user: actor } = await requireSession(request)
+        await limit(`widget-session:${actor.id}`, 20)
+        const created = await mintWidgetSession(actor.id)
+        return json(
+          {
+            token: created.token,
+            expiresAt: created.expiresAt,
+            user: { id: actor.id, name: actor.name, image: actor.image },
+          },
+          201,
+        )
+      }
+      if (request.method === 'DELETE') {
+        await revokeWidgetSession(bearerToken(request))
+        return json({ ok: true })
+      }
+      throw new HttpError(405, '不支持此请求方法')
     }
     throw new HttpError(404, '接口不存在')
   } catch (error) {

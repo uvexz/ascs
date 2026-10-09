@@ -139,4 +139,6 @@ export const memberInput = z.object({
   confirmOwner: z.boolean().default(false),
 })
 export const PAGE_SIZE = 20
+export const WIDGET_SESSION_TTL = 12 * 60 * 60 * 1000
+export const WIDGET_SESSION_AGENT = 'ascs-widget'
 export type SiteSettings = z.input<typeof siteSettings>

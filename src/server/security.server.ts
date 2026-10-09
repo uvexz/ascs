@@ -1,14 +1,16 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, lte, sql } from 'drizzle-orm'
 import { db } from '../db'
 import {
   instanceAdmins,
   members,
   rateLimits,
+  session as sessions,
   sites,
   user as users,
 } from '../db/schema'
 import { auth } from '../lib/auth'
+import { WIDGET_SESSION_AGENT, WIDGET_SESSION_TTL } from '../lib/validation'
 
 export class HttpError extends Error {
   constructor(
@@ -113,6 +115,10 @@ export async function limit(key: string, max: number, windowMs = 60_000) {
     .returning()
   check(row.count <= max, 429, '请求过于频繁，请稍后重试')
 }
+export function bearerToken(request: Request) {
+  const header = request.headers.get('authorization') || ''
+  return /^bearer /i.test(header) ? header.slice(7).trim() : ''
+}
 export async function getSession(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session) return null
@@ -122,12 +128,48 @@ export async function getSession(request: Request) {
     .where(eq(users.id, session.user.id))
     .then((rows) => rows.at(0))
   check(person && !person.disabled, 403, '账号已停用')
-  return { ...session, user: person }
+  return { ...session, user: person, widget: !!bearerToken(request) }
 }
 export async function requireSession(request: Request) {
   const session = await getSession(request)
   check(session, 401, '请先登录')
+  check(!session.widget, 401, '请先登录')
   return session
+}
+export async function mintWidgetSession(userId: string) {
+  const now = Date.now()
+  await db
+    .delete(sessions)
+    .where(
+      and(
+        eq(sessions.userId, userId),
+        eq(sessions.userAgent, WIDGET_SESSION_AGENT),
+        lte(sessions.expiresAt, new Date(now)),
+      ),
+    )
+  const context = await auth.$context
+  const created = await context.internalAdapter.createSession(
+    userId,
+    false,
+    {
+      userAgent: WIDGET_SESSION_AGENT,
+      expiresAt: new Date(now + WIDGET_SESSION_TTL),
+    },
+    true,
+  )
+  check(created, 500, '无法创建会话')
+  return created
+}
+export async function revokeWidgetSession(token: string) {
+  if (!token) return
+  await db
+    .delete(sessions)
+    .where(
+      and(
+        eq(sessions.token, token),
+        eq(sessions.userAgent, WIDGET_SESSION_AGENT),
+      ),
+    )
 }
 export async function isAdmin(userId: string) {
   return !!(

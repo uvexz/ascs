@@ -1,4 +1,10 @@
+import { getWidgetToken } from './widget-session'
+
 type FieldIssue = { path: Array<string | number>; message: string }
+
+const widgetPaths = ['widget/', 'config', 'comments', 'likes']
+const usesWidgetAuth = (path: string) =>
+  widgetPaths.some((prefix) => path.startsWith(prefix))
 
 export class ApiError extends Error {
   constructor(
@@ -12,18 +18,25 @@ export class ApiError extends Error {
 
 export async function api<T>(
   path: string,
-  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  options: {
+    method?: string
+    body?: unknown
+    signal?: AbortSignal
+    skipAuth?: boolean
+  } = {},
 ): Promise<T> {
+  const token =
+    options.skipAuth || !usesWidgetAuth(path) ? '' : getWidgetToken()
+  const headers: Record<string, string> = {}
+  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (token) headers.Authorization = `Bearer ${token}`
   let response: Response
   try {
     response = await fetch(`/api/v1/${path}`, {
       method: options.method || 'GET',
       credentials: 'same-origin',
       signal: options.signal,
-      headers:
-        options.body !== undefined
-          ? { 'Content-Type': 'application/json' }
-          : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body:
         options.body !== undefined ? JSON.stringify(options.body) : undefined,
     })

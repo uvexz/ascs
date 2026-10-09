@@ -14,6 +14,12 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../lib/api'
 import { authClient } from '../lib/auth-client'
+import {
+  clearWidgetToken,
+  getWidgetToken,
+  setWidgetToken,
+  useWidgetSession,
+} from '../lib/widget-session'
 import { profileUrl } from '../lib/validation'
 import { AuthForm } from './auth-form'
 import { Avatar } from './avatar'
@@ -49,8 +55,22 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
       api<Config>(`config?${queryString(options)}`, { signal }),
     staleTime: 300_000,
   })
-  const session = authClient.useSession()
+  const embedded = typeof window !== 'undefined' && window.parent !== window
+  const [token, setToken] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : getWidgetToken(),
+  )
+  const cookieSession = authClient.useSession()
+  const widgetSession = useWidgetSession(embedded ? token : null)
+  const session = embedded
+    ? {
+        data: widgetSession.data,
+        isPending: widgetSession.isPending,
+        refetch: widgetSession.refetch,
+      }
+    : cookieSession
   const [authOpen, setAuthOpen] = useState(false)
+  const popupRef = useRef<Window | null>(null)
+  const nonceRef = useRef('')
   const [reply, setReply] = useState<{ id: string; author: string } | null>(
     null,
   )
@@ -78,9 +98,51 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
   useEffect(() => {
     replyRef.current = reply
   }, [reply])
-  const embedded = typeof window !== 'undefined' && window.parent !== window
+  useEffect(() => {
+    if (!embedded) return
+    const listener = (event: MessageEvent) => {
+      if (
+        event.origin !== window.location.origin ||
+        event.source !== popupRef.current ||
+        !event.data ||
+        event.data.type !== 'ascs:widget-session' ||
+        event.data.state !== nonceRef.current ||
+        typeof event.data.token !== 'string' ||
+        !event.data.token
+      )
+        return
+      setWidgetToken(event.data.token)
+      setToken(event.data.token)
+      popupRef.current?.close()
+      popupRef.current = null
+      setAuthOpen(false)
+      void queryClient.invalidateQueries({ queryKey: ['widget-session'] })
+      void queryClient.invalidateQueries({
+        queryKey: ['comments', options.siteId],
+      })
+    }
+    window.addEventListener('message', listener)
+    return () => window.removeEventListener('message', listener)
+  }, [embedded, queryClient, options.siteId])
   function openLogin() {
-    setAuthOpen(true)
+    if (!embedded) {
+      setAuthOpen(true)
+      return
+    }
+    const nonce = crypto.randomUUID()
+    nonceRef.current = nonce
+    const url = new URL('/widget-login', window.location.origin)
+    url.searchParams.set('state', nonce)
+    const popup = window.open(
+      url.href,
+      'ascs-widget-login',
+      'popup,width=480,height=640',
+    )
+    if (!popup) {
+      setError('浏览器阻止了登录窗口，请允许弹出窗口后重试。')
+      return
+    }
+    popupRef.current = popup
   }
   const theme = options.theme || config.data?.theme || 'auto'
   useEffect(() => {
@@ -241,6 +303,19 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
               title="退出登录"
               className="shrink-0"
               onClick={async () => {
+                if (embedded) {
+                  try {
+                    await api('widget/session', { method: 'DELETE' })
+                  } catch {
+                    setError('退出请求未送达，已在本地退出。')
+                  }
+                  clearWidgetToken()
+                  setToken(null)
+                  await queryClient.invalidateQueries({
+                    queryKey: ['comments', options.siteId],
+                  })
+                  return
+                }
                 const result = await authClient.signOut()
                 if (result.error) setError(result.error.message || '退出失败')
                 else
@@ -482,24 +557,6 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
           <img src="/brand.svg" alt="" width="16" height="16" />
           ASCS
         </a>
-        <nav className="footer-links" aria-label="法务信息">
-          <a
-            className="text-link"
-            href="/tos"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            服务条款
-          </a>
-          <a
-            className="text-link"
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            隐私声明
-          </a>
-        </nav>
       </footer>
       <AppDialog
         open={authOpen}

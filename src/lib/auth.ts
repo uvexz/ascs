@@ -1,4 +1,5 @@
 import { betterAuth, APIError } from 'better-auth'
+import { bearer } from 'better-auth/plugins/bearer'
 import { eq } from 'drizzle-orm'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { db } from '../db'
@@ -127,6 +128,7 @@ export const auth = betterAuth({
   },
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
+  plugins: [bearer()],
   advanced: {
     database: { generateId: 'uuid' },
     ipAddress: {

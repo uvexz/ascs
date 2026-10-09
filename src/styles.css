@@ -849,9 +849,8 @@ input[type='checkbox'] {
 }
 .widget-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  flex-wrap: wrap;
   gap: 10px 16px;
   padding-top: 24px;
   color: var(--muted);
