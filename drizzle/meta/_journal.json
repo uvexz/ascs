@@ -22,6 +22,20 @@
       "when": 1791532730317,
       "tag": "0002_wise_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791544349404,
+      "tag": "0003_volatile_groot",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791547071454,
+      "tag": "0004_slippery_nomad",
+      "breakpoints": true
     }
   ]
 }

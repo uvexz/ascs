@@ -11,7 +11,7 @@ ASCS（A Simple Comment System）是一个面向多站点博客的评论服务�
 - TanStack Start + TanStack Router + TanStack Query
 - Tailwind CSS v4 + Cloudflare Kumo UI
 - Drizzle ORM + libSQL/Turso
-- Better Auth（SQLite 数据库适配器，邮箱密码，可选 GitHub/Google OAuth）
+- Better Auth（SQLite 数据库适配器，邮箱密码，可选 GitHub/Google/Microsoft OAuth）
 - Nitro Node server，可用于 Vercel、Docker、VPS
 
 ## 本地运行
@@ -81,7 +81,7 @@ bun run dev
 - `DATABASE_AUTH_TOKEN`：Turso token
 - `BETTER_AUTH_URL`、`BETTER_AUTH_SECRET`：认证回调地址和至少 32 字符密钥
 - `TRUSTED_IP_HEADER`：只有反向代理会覆盖此 header 时才设置，用于限流和封禁 IP
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`：可选 OAuth
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`：可选 OAuth（`MICROSOFT_TENANT_ID` 可选，默认 `common`）
 - `SMTP_URL`、`MAIL_FROM`：可选 SMTP；站点邮件写入 outbox，由 cron 或 VPS 定时任务发送
 - `CRON_SECRET`：至少 32 字符，用于 `/api/v1/cron/mail`
 

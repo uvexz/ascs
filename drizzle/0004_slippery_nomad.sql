@@ -1,0 +1,1 @@
+ALTER TABLE `user` ADD `email_change_used_at` integer;

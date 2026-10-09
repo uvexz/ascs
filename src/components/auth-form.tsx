@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import {
+  ArrowRightIcon,
   GithubLogoIcon,
   GoogleLogoIcon,
-  ArrowRightIcon,
+  SquaresFourIcon,
 } from '@phosphor-icons/react'
 import { authClient } from '../lib/auth-client'
 import { api, errorText, fieldError } from '../lib/api'
@@ -12,9 +13,11 @@ import { api, errorText, fieldError } from '../lib/api'
 export function AuthForm({
   compact = false,
   initialMode = 'login',
+  inFrame = false,
 }: {
   compact?: boolean
   initialMode?: 'login' | 'signup' | 'reset'
+  inFrame?: boolean
 }) {
   const queryClient = useQueryClient()
   const [mode, setMode] = useState<'login' | 'signup' | 'reset'>(initialMode)
@@ -27,6 +30,7 @@ export function AuthForm({
       api<{
         github: boolean
         google: boolean
+        microsoft: boolean
         name: string
         allowRegistration: boolean
       }>('auth-config'),
@@ -72,10 +76,27 @@ export function AuthForm({
       setBusy(false)
     }
   }
-  async function social(provider: 'github' | 'google') {
+  async function social(provider: 'github' | 'google' | 'microsoft') {
     setBusy(true)
     setError(null)
     try {
+      if (inFrame) {
+        const popup = window.open('about:blank', '_blank')
+        if (!popup)
+          throw new Error('浏览器阻止了登录窗口，请允许弹出窗口后重试。')
+        const result = await authClient.signIn.social({
+          provider,
+          callbackURL: window.location.href,
+          disableRedirect: true,
+        })
+        const url = result.data?.url
+        if (result.error || !url) {
+          popup.close()
+          throw new Error(result.error?.message || '无法获取第三方登录地址')
+        }
+        popup.location.replace(url)
+        return
+      }
       const result = await authClient.signIn.social({
         provider,
         callbackURL: window.location.href,
@@ -83,6 +104,7 @@ export function AuthForm({
       if (result.error) throw new Error(result.error.message)
     } catch (errorValue) {
       setError(errorValue)
+    } finally {
       setBusy(false)
     }
   }
@@ -171,30 +193,49 @@ export function AuthForm({
           第三方登录暂时不可用，你仍可以使用邮箱登录。
         </p>
       )}
-      {(providers.data?.github || providers.data?.google) &&
+      {(providers.data?.github ||
+        providers.data?.google ||
+        providers.data?.microsoft) &&
         mode !== 'reset' && (
-          <div className="flex gap-2 mt-4">
-            {providers.data.github && (
-              <Button
-                className="flex-1"
-                onClick={() => social('github')}
-                disabled={busy}
-              >
-                <GithubLogoIcon size={18} />
-                GitHub
-              </Button>
+          <>
+            <div className="flex flex-wrap gap-2 mt-4">
+              {providers.data.github && (
+                <Button
+                  className="flex-1"
+                  onClick={() => social('github')}
+                  disabled={busy}
+                >
+                  <GithubLogoIcon size={18} />
+                  GitHub
+                </Button>
+              )}
+              {providers.data.google && (
+                <Button
+                  className="flex-1"
+                  onClick={() => social('google')}
+                  disabled={busy}
+                >
+                  <GoogleLogoIcon size={18} />
+                  Google
+                </Button>
+              )}
+              {providers.data.microsoft && (
+                <Button
+                  className="flex-1"
+                  onClick={() => social('microsoft')}
+                  disabled={busy}
+                >
+                  <SquaresFourIcon size={18} />
+                  Microsoft
+                </Button>
+              )}
+            </div>
+            {inFrame && (
+              <p className="text-muted mt-2">
+                第三方登录将在新窗口中完成授权。
+              </p>
             )}
-            {providers.data.google && (
-              <Button
-                className="flex-1"
-                onClick={() => social('google')}
-                disabled={busy}
-              >
-                <GoogleLogoIcon size={18} />
-                Google
-              </Button>
-            )}
-          </div>
+          </>
         )}
       <div className="flex flex-wrap gap-x-5 gap-y-2 mt-5 text-muted">
         {(providers.data?.allowRegistration || mode === 'signup') && (

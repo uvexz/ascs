@@ -37,6 +37,52 @@ export function secureEqual(a: string, b: string) {
 }
 export const baseOrigin = () =>
   new URL(process.env.BETTER_AUTH_URL || 'http://localhost:3000').origin
+
+const EMAIL_CHANGE_TTL = 60 * 60 * 1000
+export type EmailChangeToken = {
+  userId: string
+  newEmail: string
+  fromEmail: string
+  expiresAt: number
+}
+export function emailChangeToken(
+  userId: string,
+  newEmail: string,
+  fromEmail: string,
+) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      userId,
+      newEmail,
+      fromEmail,
+      expiresAt: Date.now() + EMAIL_CHANGE_TTL,
+    }),
+  ).toString('base64url')
+  return `${payload}.${digest(`email-change:${payload}`)}`
+}
+export function readEmailChangeToken(token: string): EmailChangeToken | null {
+  const [payload = '', signature = ''] = token.split('.')
+  if (!payload || !secureEqual(signature, digest(`email-change:${payload}`)))
+    return null
+  try {
+    const parsed: unknown = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf8'),
+    )
+    if (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      typeof (parsed as EmailChangeToken).userId === 'string' &&
+      typeof (parsed as EmailChangeToken).newEmail === 'string' &&
+      typeof (parsed as EmailChangeToken).fromEmail === 'string' &&
+      typeof (parsed as EmailChangeToken).expiresAt === 'number' &&
+      (parsed as EmailChangeToken).expiresAt > Date.now()
+    )
+      return parsed as EmailChangeToken
+  } catch {
+    return null
+  }
+  return null
+}
 export function requireOrigin(request: Request) {
   check(request.headers.get('origin') === baseOrigin(), 403, '请求来源不受信任')
   check(
@@ -110,11 +156,12 @@ export async function authorize(
     .limit(1)
   check(site, 404, '站点不存在')
   if (await isAdmin(user.id)) return { site, user, role: 'owner' as const }
-  const [member] = await db
+  const member = await db
     .select()
     .from(members)
     .where(and(eq(members.siteId, siteId), eq(members.userId, user.id)))
     .limit(1)
+    .then((rows) => rows.at(0))
   check(
     member && (!ownerOnly || member.role === 'owner'),
     403,

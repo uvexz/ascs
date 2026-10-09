@@ -39,6 +39,15 @@ export const auth = betterAuth({
           },
         }
       : {}),
+    ...(process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+      ? {
+          microsoft: {
+            clientId: process.env.MICROSOFT_CLIENT_ID,
+            clientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+            tenantId: process.env.MICROSOFT_TENANT_ID || 'common',
+          },
+        }
+      : {}),
   },
   user: {
     additionalFields: {
@@ -108,7 +117,14 @@ export const auth = betterAuth({
       },
     },
   },
-  account: { accountLinking: { enabled: false } },
+  account: {
+    accountLinking: {
+      enabled: true,
+      disableImplicitLinking: true,
+      allowDifferentEmails: true,
+      trustedProviders: ['github', 'google', 'microsoft'],
+    },
+  },
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
   advanced: {

@@ -22,6 +22,7 @@ export const user = sqliteTable('user', {
   updatedAt: timestamp('updated_at').notNull(),
   siteLimit: integer('site_limit').notNull().default(0),
   disabled: integer('disabled', { mode: 'boolean' }).notNull().default(false),
+  emailChangeUsedAt: integer('email_change_used_at', { mode: 'timestamp_ms' }),
 })
 export const session = sqliteTable(
   'session',
@@ -153,6 +154,9 @@ export const comments = sqliteTable(
       t.createdAt,
     ),
     index('comments_moderation_idx').on(t.siteId, t.status, t.createdAt),
+    index('comments_user_idx').on(t.userId),
+    index('comments_email_idx').on(t.emailHash),
+    index('comments_ip_idx').on(t.ipHash),
   ],
 )
 export const likes = sqliteTable(
@@ -163,7 +167,10 @@ export const likes = sqliteTable(
       .references(() => comments.id, { onDelete: 'cascade' }),
     voter: text('voter').notNull(),
   },
-  (t) => [primaryKey({ columns: [t.commentId, t.voter] })],
+  (t) => [
+    primaryKey({ columns: [t.commentId, t.voter] }),
+    index('likes_voter_idx').on(t.voter),
+  ],
 )
 export const bans = sqliteTable(
   'bans',

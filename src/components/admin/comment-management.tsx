@@ -1,0 +1,371 @@
+import { useEffect, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button } from '@cloudflare/kumo'
+import {
+  ChatCircleIcon,
+  CheckIcon,
+  ShieldCheckIcon,
+  TrashIcon,
+  WarningCircleIcon,
+} from '@phosphor-icons/react'
+import { api, errorText, queryString } from '../../lib/api'
+import { invalidateSiteCaches } from '../../lib/cache'
+import { Avatar } from '../avatar'
+import { AppDialog, QueryError } from '../ui'
+import { Markdown } from '../markdown'
+import { Pagination } from '../pagination'
+import { StatsStrip } from './stats-strip'
+import { statusLabels } from './shared'
+import type { AdminComments, SiteDetail } from '../../server/api.server'
+import type { AdminSearch } from '../../lib/validation'
+import type { Status } from './shared'
+
+export function CommentManagement({
+  detail,
+  status,
+  page,
+  onStateChange,
+}: {
+  detail: SiteDetail
+  status: Status
+  page: number
+  onStateChange: (patch: Partial<AdminSearch>) => void
+}) {
+  const queryClient = useQueryClient()
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [banTarget, setBanTarget] = useState<
+    AdminComments['items'][number] | null
+  >(null)
+  const [notice, setNotice] = useState('')
+  const list = useQuery({
+    queryKey: ['admin-comments', detail.site.id, status, page],
+    queryFn: ({ signal }) =>
+      api<AdminComments>(
+        `sites/${detail.site.id}/comments?${queryString({ status, page })}`,
+        { signal },
+      ),
+  })
+  useEffect(() => {
+    if (list.data && list.data.page !== page)
+      onStateChange({ page: list.data.page })
+  }, [list.data, onStateChange, page])
+  async function refresh() {
+    await invalidateSiteCaches(queryClient, detail.site.id)
+  }
+  const moderate = useMutation({
+    mutationFn: (input: {
+      commentId: string
+      status: 'approved' | 'spam' | 'deleted'
+    }) =>
+      api(`sites/${detail.site.id}/comments`, { method: 'POST', body: input }),
+    onSuccess: async (_, input) => {
+      setDeleteId(null)
+      setNotice(
+        input.status === 'approved'
+          ? '评论已发布。'
+          : input.status === 'spam'
+            ? '评论已标记为垃圾评论。'
+            : '评论已删除。',
+      )
+      await refresh()
+    },
+  })
+  const ban = useMutation({
+    mutationFn: (input: { commentId: string; kind: 'user' | 'email' | 'ip' }) =>
+      api(`sites/${detail.site.id}/bans`, { method: 'POST', body: input }),
+    onSuccess: async (_, input) => {
+      setBanTarget(null)
+      setNotice(
+        input.kind === 'ip'
+          ? '已封禁该来源 IP。'
+          : input.kind === 'email'
+            ? '已封禁该邮箱。'
+            : '已封禁该账号。',
+      )
+      await refresh()
+    },
+  })
+  const setStatus = (next: Status) => {
+    setNotice('')
+    onStateChange({ status: next, page: 1 })
+  }
+  return (
+    <>
+      <StatsStrip detail={detail} />
+      <div className="list-toolbar">
+        <div className="tabs" role="toolbar" aria-label="评论状态筛选">
+          {Object.entries(statusLabels).map(([value, label]) => (
+            <button
+              type="button"
+              aria-pressed={status === value}
+              key={value}
+              className={status === value ? 'selected' : ''}
+              onClick={() => setStatus(value as Status)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="text-muted">
+          第 {list.data?.page || page} 页，共 {list.data?.totalPages || '—'} 页
+        </span>
+      </div>
+      {notice && (
+        <p role="status" className="success-box my-4">
+          {notice}
+        </p>
+      )}
+      {moderate.error && !deleteId && (
+        <p role="alert" className="error-box my-4">
+          {errorText(moderate.error)}
+        </p>
+      )}
+      {ban.error && !banTarget && (
+        <p role="alert" className="error-box my-4">
+          {errorText(ban.error)}
+        </p>
+      )}
+      {list.isPending ? (
+        <p role="status" className="py-10">
+          正在加载评论…
+        </p>
+      ) : list.error ? (
+        <QueryError error={list.error} retry={list.refetch} />
+      ) : !list.data.items.length ? (
+        <div className="empty-state">
+          <ChatCircleIcon size={36} aria-hidden="true" />
+          <h2>暂无{status === 'all' ? '' : statusLabels[status]}评论</h2>
+          <p>可以切换其他状态筛选查看内容。</p>
+        </div>
+      ) : (
+        <div
+          className="comment-list"
+          role="region"
+          tabIndex={-1}
+          aria-label="评论列表"
+        >
+          {list.data.items.map((comment) => (
+            <article key={comment.id} className="admin-comment">
+              <Avatar name={comment.author} image={comment.image} />
+              <div className="min-w-0 flex-1">
+                <div className="comment-meta">
+                  <strong className="break-words">{comment.author}</strong>
+                  <span className={`badge ${comment.status}`}>
+                    {statusLabels[comment.status]}
+                  </span>
+                  <time>
+                    {new Date(comment.createdAt).toLocaleString('zh-CN')}
+                  </time>
+                </div>
+                <a
+                  className="article-link"
+                  href={comment.pageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {new URL(comment.pageUrl).pathname || '/'}
+                </a>
+                {comment.parentAuthor && (
+                  <div className="parent-context">
+                    <span>回复 {comment.parentAuthor}</span>
+                    {comment.parentBody && (
+                      <span className="line-clamp-2">{comment.parentBody}</span>
+                    )}
+                  </div>
+                )}
+                {comment.status === 'deleted' ? (
+                  <p className="text-muted py-3">评论已删除</p>
+                ) : (
+                  <Markdown>{comment.body}</Markdown>
+                )}
+                {comment.spamReason && (
+                  <span className="text-muted">
+                    垃圾检测：
+                    {comment.spamReason === 'blocked-word'
+                      ? '屏蔽词'
+                      : '链接过多'}
+                  </span>
+                )}
+              </div>
+              {comment.status !== 'deleted' && (
+                <div className="comment-actions">
+                  {comment.status !== 'approved' && (
+                    <Button
+                      shape="square"
+                      variant="ghost"
+                      aria-label="发布评论"
+                      title="发布评论"
+                      loading={
+                        moderate.isPending &&
+                        moderate.variables.commentId === comment.id
+                      }
+                      disabled={moderate.isPending}
+                      onClick={() =>
+                        moderate.mutate({
+                          commentId: comment.id,
+                          status: 'approved',
+                        })
+                      }
+                    >
+                      <CheckIcon size={18} />
+                    </Button>
+                  )}
+                  {comment.status !== 'spam' && (
+                    <Button
+                      shape="square"
+                      variant="ghost"
+                      aria-label="标记垃圾评论"
+                      title="标记垃圾评论"
+                      loading={
+                        moderate.isPending &&
+                        moderate.variables.commentId === comment.id
+                      }
+                      disabled={moderate.isPending}
+                      onClick={() =>
+                        moderate.mutate({
+                          commentId: comment.id,
+                          status: 'spam',
+                        })
+                      }
+                    >
+                      <WarningCircleIcon size={18} />
+                    </Button>
+                  )}
+                  <Button
+                    shape="square"
+                    variant="ghost"
+                    aria-label="封禁评论者"
+                    title="封禁评论者"
+                    onClick={() => {
+                      ban.reset()
+                      setBanTarget(comment)
+                    }}
+                  >
+                    <ShieldCheckIcon size={18} />
+                  </Button>
+                  <Button
+                    shape="square"
+                    variant="ghost"
+                    aria-label="删除评论"
+                    title="删除评论"
+                    onClick={() => {
+                      moderate.reset()
+                      setDeleteId(comment.id)
+                    }}
+                  >
+                    <TrashIcon size={18} />
+                  </Button>
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+      <Pagination
+        page={page}
+        setPage={(next) => onStateChange({ page: next })}
+        hasMore={!!list.data?.hasMore}
+        loading={list.isFetching}
+        totalPages={list.data?.totalPages}
+      />
+      <AppDialog
+        open={!!deleteId}
+        onOpenChange={(open) => {
+          if (!open && !moderate.isPending) setDeleteId(null)
+        }}
+        title="删除评论？"
+        description="内容和身份信息将永久清除，嵌套回复会保留。"
+        alert
+        busy={moderate.isPending}
+      >
+        <div>
+          {moderate.error && (
+            <p role="alert" className="error-box mb-4">
+              {errorText(moderate.error)}
+            </p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              onClick={() => setDeleteId(null)}
+              disabled={moderate.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              icon={TrashIcon}
+              loading={moderate.isPending}
+              onClick={() =>
+                deleteId &&
+                moderate.mutate({ commentId: deleteId, status: 'deleted' })
+              }
+            >
+              删除
+            </Button>
+          </div>
+        </div>
+      </AppDialog>
+      <AppDialog
+        open={!!banTarget}
+        onOpenChange={(open) => {
+          if (!open && !ban.isPending) setBanTarget(null)
+        }}
+        title="封禁评论者"
+        description={
+          banTarget
+            ? `当前评论者：${banTarget.author}。仅影响当前站点，不会自动删除历史评论。`
+            : ''
+        }
+        busy={ban.isPending}
+      >
+        <div>
+          {ban.error && (
+            <p role="alert" className="error-box mb-4">
+              {errorText(ban.error)}
+            </p>
+          )}
+          <div className="grid gap-3">
+            <Button
+              disabled={ban.isPending || !banTarget?.userId}
+              onClick={() =>
+                banTarget &&
+                ban.mutate({ commentId: banTarget.id, kind: 'user' })
+              }
+            >
+              封禁账号
+            </Button>
+            <Button
+              disabled={ban.isPending || !banTarget?.hasEmail}
+              onClick={() =>
+                banTarget &&
+                ban.mutate({ commentId: banTarget.id, kind: 'email' })
+              }
+            >
+              封禁邮箱
+            </Button>
+            <Button
+              disabled={ban.isPending || !detail.canBanIp || !banTarget?.hasIp}
+              onClick={() =>
+                banTarget && ban.mutate({ commentId: banTarget.id, kind: 'ip' })
+              }
+            >
+              封禁 IP
+            </Button>
+            {!detail.canBanIp && (
+              <p className="text-muted">
+                当前服务未配置可信 IP 来源，无法安全区分不同评论者的 IP。
+              </p>
+            )}
+            <Button
+              variant="ghost"
+              onClick={() => setBanTarget(null)}
+              disabled={ban.isPending}
+            >
+              取消
+            </Button>
+          </div>
+        </div>
+      </AppDialog>
+    </>
+  )
+}

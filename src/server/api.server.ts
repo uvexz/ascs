@@ -46,14 +46,21 @@ import { flushMail } from './mail.server'
 import { handleAdmin } from './admin.server'
 import { publicSettings } from './settings.server'
 import { body, params, json } from './http.server'
-import { getProfile, updateProfile } from './profile.server'
+import {
+  confirmEmailChange,
+  getProfile,
+  getProfileAccounts,
+  requestEmailChange,
+  updateProfile,
+} from './profile.server'
 
 export async function publicContext(input: z.infer<typeof pageInput>) {
-  const [site] = await db
+  const site = await db
     .select()
     .from(sites)
     .where(eq(sites.id, input.siteId))
     .limit(1)
+    .then((rows) => rows.at(0))
   check(site?.verifiedAt && site.enabled, 404, '站点未验证、已停用或不存在')
   const url = new URL(input.pageUrl)
   check(
@@ -369,14 +376,34 @@ async function toggleLike(request: Request) {
 export async function dashboard(request: Request) {
   const session = await requireSession(request)
   const admin = await isAdmin(session.user.id)
-  const accessible = admin
-    ? await db.select().from(sites).orderBy(desc(sites.createdAt))
-    : await db
-        .select({ site: sites, role: members.role })
-        .from(members)
-        .innerJoin(sites, eq(sites.id, members.siteId))
-        .where(eq(members.userId, session.user.id))
-        .then((rows) => rows.map((row) => ({ ...row.site, role: row.role })))
+  const selected = new URL(request.url).searchParams.get('site')
+  let accessible: Array<
+    typeof sites.$inferSelect & { role?: 'owner' | 'moderator' }
+  >
+  if (admin) {
+    const rows = await db
+      .select()
+      .from(sites)
+      .orderBy(desc(sites.createdAt))
+      .limit(PAGE_SIZE)
+    if (selected && !rows.some((site) => site.id === selected)) {
+      const extra = await db
+        .select()
+        .from(sites)
+        .where(eq(sites.id, selected))
+        .limit(1)
+        .then((found) => found.at(0))
+      if (extra) rows.unshift(extra)
+    }
+    accessible = rows
+  } else {
+    accessible = await db
+      .select({ site: sites, role: members.role })
+      .from(members)
+      .innerJoin(sites, eq(sites.id, members.siteId))
+      .where(eq(members.userId, session.user.id))
+      .then((rows) => rows.map((row) => ({ ...row.site, role: row.role })))
+  }
   return {
     user: {
       id: session.user.id,
@@ -401,6 +428,77 @@ export async function dashboard(request: Request) {
   }
 }
 export type Dashboard = Awaited<ReturnType<typeof dashboard>>
+
+export async function listSites(request: Request) {
+  const session = await requireSession(request)
+  const admin = await isAdmin(session.user.id)
+  const input = z
+    .object({
+      q: z.string().trim().max(100).default(''),
+      page: z.coerce.number().int().min(1).max(10000).default(1),
+    })
+    .parse(params(request))
+  const needle = input.q.toLowerCase()
+  if (!admin) {
+    const rows = await db
+      .select({ site: sites, role: members.role })
+      .from(members)
+      .innerJoin(sites, eq(sites.id, members.siteId))
+      .where(eq(members.userId, session.user.id))
+      .then((list) =>
+        list
+          .map((row) => ({
+            id: row.site.id,
+            name: row.site.name,
+            origin: row.site.origin,
+            role: row.role,
+          }))
+          .filter(
+            (site) =>
+              !needle ||
+              site.name.toLowerCase().includes(needle) ||
+              site.origin.toLowerCase().includes(needle),
+          ),
+      )
+    const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
+    const page = Math.min(input.page, totalPages)
+    return {
+      items: rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+      total: rows.length,
+      totalPages,
+      page,
+      hasMore: page < totalPages,
+    }
+  }
+  const where = input.q
+    ? or(
+        sql`lower(${sites.name}) like ${`%${needle}%`}`,
+        sql`lower(${sites.origin}) like ${`%${needle}%`}`,
+      )
+    : undefined
+  const [count] = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(sites)
+    .where(where)
+  const totalPages = Math.max(1, Math.ceil(count.count / PAGE_SIZE))
+  const page = Math.min(input.page, totalPages)
+  const items = await db
+    .select({ id: sites.id, name: sites.name, origin: sites.origin })
+    .from(sites)
+    .where(where)
+    .orderBy(desc(sites.createdAt))
+    .limit(PAGE_SIZE)
+    .offset((page - 1) * PAGE_SIZE)
+    .then((list) => list.map((site) => ({ ...site, role: 'owner' as const })))
+  return {
+    items,
+    total: count.count,
+    totalPages,
+    page,
+    hasMore: page < totalPages,
+  }
+}
+export type SiteList = Awaited<ReturnType<typeof listSites>>
 
 export async function adminComments(request: Request, siteId: string) {
   await authorize(request, siteId)
@@ -592,11 +690,12 @@ async function manageSite(request: Request, siteId: string, action?: string) {
   }
   if (action === 'bans' && request.method === 'POST') {
     const input = banInput.parse(await body(request))
-    const [comment] = await db
+    const comment = await db
       .select()
       .from(comments)
       .where(and(eq(comments.id, input.commentId), eq(comments.siteId, siteId)))
       .limit(1)
+      .then((rows) => rows.at(0))
     check(comment && comment.status !== 'deleted', 404, '评论不存在')
     const value =
       input.kind === 'user'
@@ -649,6 +748,20 @@ async function manageSite(request: Request, siteId: string, action?: string) {
       .where(and(eq(members.siteId, siteId), eq(members.userId, person.id)))
       .limit(1)
     check(!existing.length, 409, '用户已是成员；修改角色请先移除')
+    if (input.role === 'owner') {
+      check(!person.disabled, 400, '该用户已停用')
+      if (!(await isAdmin(person.id))) {
+        const [owned] = await db
+          .select({ count: sql<number>`count(*)` })
+          .from(members)
+          .where(and(eq(members.userId, person.id), eq(members.role, 'owner')))
+        check(
+          owned.count < person.siteLimit,
+          400,
+          '该用户站点额度不足，请先调整额度',
+        )
+      }
+    }
     await db
       .insert(members)
       .values({ siteId, userId: person.id, role: input.role })
@@ -757,6 +870,23 @@ export async function handleApi(request: Request) {
       if (request.method === 'PATCH') return json(await updateProfile(request))
       throw new HttpError(405, '不支持此请求方法')
     }
+    if (
+      path[0] === 'profile' &&
+      path[1] === 'accounts' &&
+      request.method === 'GET'
+    )
+      return json(await getProfileAccounts(request))
+    if (path[0] === 'profile' && path[1] === 'email') {
+      if (path.length === 2 && request.method === 'POST')
+        return json(await requestEmailChange(request))
+      if (
+        path.length === 3 &&
+        path[2] === 'confirm' &&
+        request.method === 'GET'
+      )
+        return await confirmEmailChange(request)
+      throw new HttpError(405, '不支持此请求方法')
+    }
     if (path[0] === 'dashboard' && request.method === 'GET')
       return json(await dashboard(request))
     if (path[0] === 'auth-config' && request.method === 'GET')
@@ -767,9 +897,14 @@ export async function handleApi(request: Request) {
         google: !!(
           process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
         ),
+        microsoft: !!(
+          process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
+        ),
         email: true,
         ...(await publicSettings()),
       })
+    if (path[0] === 'sites' && !path[1] && request.method === 'GET')
+      return json(await listSites(request))
     if (path[0] === 'sites' && path[1])
       return await manageSite(request, path[1], path[2])
     if (path[0] === 'sites' && request.method === 'POST') {

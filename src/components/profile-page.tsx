@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useBlocker } from '@tanstack/react-router'
+import { Link, useBlocker, useSearch } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { ArrowLeftIcon } from '@phosphor-icons/react'
@@ -8,12 +8,24 @@ import { authClient } from '../lib/auth-client'
 import { profileInput } from '../lib/validation'
 import { AuthForm } from './auth-form'
 import { Avatar } from './avatar'
+import { ProfileSecurity } from './profile-security'
 import { QueryError } from './ui'
 import type { ProfileInput } from '../lib/validation'
 import type { Profile } from '../server/profile.server'
 
+const emailChangeMessages: Record<string, string> = {
+  ok: '邮箱已更新，后续通知将发送到新邮箱。',
+  used: '你已经使用过修改邮箱的机会。',
+  invalid: '确认链接无效或已过期。',
+  unavailable: '当前账号不支持修改邮箱。',
+}
+
 export function ProfilePage() {
   const session = authClient.useSession()
+  const search = useSearch({ from: '/profile' })
+  const emailNotice = search.emailChange
+    ? emailChangeMessages[search.emailChange]
+    : undefined
   const [userId, setUserId] = useState<string>()
   useEffect(() => {
     if (session.data) setUserId(session.data.user.id)
@@ -63,6 +75,14 @@ export function ProfilePage() {
             <p className="text-muted mt-1">管理你的昵称、头像、网站和简介。</p>
           </div>
         </div>
+        {emailNotice && (
+          <p
+            role="status"
+            className={`${search.emailChange === 'ok' ? 'success-box' : 'error-box'} mb-6`}
+          >
+            {emailNotice}
+          </p>
+        )}
         {!session.data && profile.data && (
           <div className="grid gap-3 mb-6">
             <p role="alert" className="error-box">
@@ -83,11 +103,14 @@ export function ProfilePage() {
         ) : profile.error && !profile.data ? (
           <QueryError error={profile.error} retry={profile.refetch} />
         ) : (
-          <ProfileForm
-            key={profile.data.id}
-            profile={profile.data}
-            refreshSession={session.refetch}
-          />
+          <>
+            <ProfileForm
+              key={profile.data.id}
+              profile={profile.data}
+              refreshSession={session.refetch}
+            />
+            {session.data && <ProfileSecurity email={profile.data.email} />}
+          </>
         )}
       </main>
     </div>
@@ -273,7 +296,7 @@ function ProfileForm({
           {notice}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-3 border-t border-kumo-line pt-5">
+      <div className="flex flex-wrap items-center gap-3 border-b border-kumo-line pb-5 mb-5">
         <Button
           type="submit"
           variant="primary"

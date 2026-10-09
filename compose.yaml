@@ -7,7 +7,7 @@ services:
     environment:
       DATABASE_URL: file:/app/data/ascs.db
     ports:
-      - "127.0.0.1:3000:3000"
+      - '127.0.0.1:3000:3000'
     volumes:
       - ascs-data:/app/data
     security_opt:

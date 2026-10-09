@@ -1,8 +1,43 @@
-import { useEffect, useRef } from 'react'
+import { Component, useEffect, useRef } from 'react'
 import { Button, Dialog } from '@cloudflare/kumo'
 import { XIcon } from '@phosphor-icons/react'
 import { ApiError, errorText } from '../lib/api'
-import type { ReactNode, RefObject } from 'react'
+import type { ErrorInfo, ReactNode, RefObject } from 'react'
+
+export class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: unknown; failed: boolean }
+> {
+  state = { error: null as unknown, failed: false }
+  static getDerivedStateFromError(error: unknown) {
+    return { error, failed: true }
+  }
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    console.error(
+      'ASCS view failed',
+      error instanceof Error ? error.name : 'UnknownError',
+      info.componentStack,
+    )
+  }
+  render() {
+    if (this.state.failed)
+      return (
+        <div className="query-error">
+          <p role="alert" className="error-box">
+            {errorText(this.state.error)}
+          </p>
+          <div className="flex flex-wrap gap-2 mt-3">
+            <Button
+              onClick={() => this.setState({ error: null, failed: false })}
+            >
+              重试
+            </Button>
+          </div>
+        </div>
+      )
+    return this.props.children
+  }
+}
 
 export function AppDialog({
   open,

@@ -13,7 +13,7 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 - React 19、TypeScript strict。
 - Tailwind CSS v4、`@cloudflare/kumo`：优先复用 Kumo/Base UI 的组件。
 - Drizzle ORM、`@libsql/client`：本地 SQLite 和远程 Turso。
-- Better Auth：数据库 session、邮箱密码、可选 GitHub/Google OAuth。
+- Better Auth：数据库 session、邮箱密码、可选 GitHub/Google/Microsoft OAuth。
 - `react-markdown`、`remark-gfm`：安全 Markdown 渲染。
 - Nodemailer：SMTP；数据库 outbox 负责持久化、重试和任务租约。
 - Nitro：Node server 和 PaaS 部署适配。
@@ -146,7 +146,7 @@ bun run start
 - 本地 SQLite 适合单机持久化部署；Vercel 应使用 Turso 等远程持久化数据库，不能依赖临时文件系统。
 - Docker 使用非 root 用户和持久化 volume。迁移在容器启动时执行；管理员必须初始化在容器实际使用的数据库中，不能把宿主机的另一个数据库当作已初始化 volume。
 - `BETTER_AUTH_URL` 必须匹配公开服务域名，生产密钥必须重新生成；本地及测试凭据不得用于生产。
-- OAuth callback 为 `/api/auth/callback/github` 或 `/api/auth/callback/google`。
+- OAuth callback 为 `/api/auth/callback/github`、`/api/auth/callback/google` 或 `/api/auth/callback/microsoft`。
 - 邮件 outbox 通过 `bun run mail:flush` 或受保护的 `/api/v1/cron/mail` 发送。SMTP 是至少一次投递，不能保证严格 exactly-once。
 - 根据队列量设置 cron 频率；当前 worker 每批最多 20 封，默认 Vercel 日任务不适合即时通知和较大邮件量。
 - `.env.example` 只放变量说明和空凭据；不要覆盖已存在的 `.env.local` 或 `.env`。

@@ -8,13 +8,13 @@ export function Markdown({ children }: { children: string }) {
         remarkPlugins={[remarkGfm]}
         skipHtml
         components={{
-          a: ({ children, href }) => (
+          a: ({ children: content, href }) => (
             <a
               href={href}
               rel="nofollow noopener noreferrer ugc"
               target="_blank"
             >
-              {children}
+              {content}
             </a>
           ),
           img: ({ alt }) => (

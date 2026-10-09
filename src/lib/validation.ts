@@ -35,6 +35,9 @@ export const profileInput = z
   .strict()
 export type ProfileInput = z.infer<typeof profileInput>
 
+export const emailChangeInput = z.object({ email: z.email().max(254) }).strict()
+export type EmailChangeInput = z.infer<typeof emailChangeInput>
+
 export const id = z.string().uuid()
 export const adminSearch = z.object({
   site: id.optional().catch(undefined),

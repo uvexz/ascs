@@ -6,6 +6,7 @@ import { errorText } from '../lib/api'
 
 export const Route = createFileRoute('/reset-password')({
   component: ResetPassword,
+  ssr: false,
 })
 function ResetPassword() {
   const [error, setError] = useState('')

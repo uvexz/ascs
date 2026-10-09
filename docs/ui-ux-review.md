@@ -9,7 +9,6 @@
 
 已修改的主要文件包括 `src/components/admin-app.tsx`、`src/components/comment-widget.tsx`、`src/components/auth-form.tsx`、`src/components/ui.tsx`、`src/styles.css`、`src/server/api.server.ts`、`src/lib/api.ts`、`src/lib/validation.ts`、`public/embed.js` 及认证/路由文件。
 
-
 ## 范围和验证边界
 
 已检查：
@@ -23,36 +22,36 @@
 
 验证结果：
 
-| 检查 | 结果 | 含义 |
-| --- | --- | --- |
-| 前端源码与 Kumo 规则核对 | 已完成 | 支持本报告的代码层面结论 |
-| `bun run typecheck` | 通过 | 类型检查通过，不代表视觉和交互验收通过 |
-| 声明颜色的 WCAG 对比度计算 | 已完成 | 使用 sRGB 相对亮度公式；不是屏幕截图采样 |
-| 桌面/移动端截图及浏览器交互 | 未执行 | 布局裁切、实际焦点和跨站登录仍需人工验证 |
-| UI 单元测试、自动 E2E | 未执行 | 遵守项目 `AGENT.md` 的约定 |
-| `bun run build` | 通过 | 生产构建通过；Kumo 依赖仍产生既有 `use client` 指令告警 |
+| 检查                        | 结果   | 含义                                                    |
+| --------------------------- | ------ | ------------------------------------------------------- |
+| 前端源码与 Kumo 规则核对    | 已完成 | 支持本报告的代码层面结论                                |
+| `bun run typecheck`         | 通过   | 类型检查通过，不代表视觉和交互验收通过                  |
+| 声明颜色的 WCAG 对比度计算  | 已完成 | 使用 sRGB 相对亮度公式；不是屏幕截图采样                |
+| 桌面/移动端截图及浏览器交互 | 未执行 | 布局裁切、实际焦点和跨站登录仍需人工验证                |
+| UI 单元测试、自动 E2E       | 未执行 | 遵守项目 `AGENT.md` 的约定                              |
+| `bun run build`             | 通过   | 生产构建通过；Kumo 依赖仍产生既有 `use client` 指令告警 |
 
 优先级：**P1** 影响核心操作、内容可读性或不可逆权限操作；**P2** 影响效率、可访问性或界面状态一致性；**P3** 改善视觉组织、说明和反馈。
 
 ## Kumo 规则逐项核对
 
-| 规则 | 结果 | 证据与解释 |
-| --- | --- | --- |
-| `content-text-size` 正文与控件 14px | 源码已修复，待人工 computed style 复核 | 自有页面的正文、状态、链接、导航和数据显示已调整为 14px；等宽代码块按独立代码内容处理。见 F07 |
-| `heading-case` 标题 sentence case | 当前自有文案符合 | 中文标题没有英文 title case 问题；ASCS 是产品名。用户 Markdown 标题不作为产品文案审查 |
-| `font-tracking` 不改变字距 | 当前符合 | 自有页面未发现 `tracking-*` 或 `letter-spacing` |
-| `font-weight` 不使用 `font-bold` | 源码已符合 | 未发现自有页面使用 `font-bold`；空状态标题已统一为 semibold。见 F21 |
-| `related-text-spacing` 相关文本更靠近 | 源码已调整，待人工复核 | 空状态和弹窗标题/说明已分组，操作区保留更大的组间距。见 F02、F21 |
-| `text-spacing` 文本周围光学间距 | 源码已调整，待人工复核 | 弹窗、通知、复制块和预览区已分别使用垂直略小于水平的内距。见 F21 |
-| `hover-color-transitions` hover 色立即变化 | 当前页面已符合 | 已检查的页面没有颜色过渡；遗留的 `header-user.tsx` 也已移除 `transition-colors`。 |
-| `shadow-borders` 阴影配 ring | 当前符合 | 自有有 border 的面板没有同时添加投影；Kumo Dialog/Button 使用 ring |
-| `concentric-border-radius` 同心圆角 | 需视觉复核 | 没有发现明确的自定义近距离嵌套圆角错误；先修复 Dialog 内边距，再验证外框与控件距离 |
-| `icon-alignment` 图标对齐第一行 | 源码已调整，待人工复核 | 通知条、回复目标和相关多行文本已使用首行 line-height 容器。见 F21 |
-| `inline-monospace-size` 行内等宽字缩小 | 源码已符合，待人工复核 | DNS 主机名和嵌入代码说明中的行内 code 已使用约 0.9em；独立代码块仍使用独立字号。见 F21 |
-| `sticky-borders` sticky 元素有分隔线 | 当前符合 | 桌面 sidebar 有右边框，移动端转静态并有下边框 |
-| `collapse-content-size` 折叠动画维持内容尺寸 | 当前无适用动画 | 回复采用即时挂载/卸载，没有 width/height 折叠动画；不能据此宣称动画已验证 |
-| `layer-card-nesting` 不嵌套 LayerCard | 当前符合 | 自有页面没有叠加嵌套 LayerCard；Dialog 内部使用 LayerCard 属于组件实现 |
-| `dialog-rendering` Dialog 保持挂载 | 当前符合 | 添加站点、删除、封禁、登录都通过 `Dialog.Root open` 控制，没有 `open && <Dialog>` 模式 |
+| 规则                                         | 结果                                   | 证据与解释                                                                                    |
+| -------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `content-text-size` 正文与控件 14px          | 源码已修复，待人工 computed style 复核 | 自有页面的正文、状态、链接、导航和数据显示已调整为 14px；等宽代码块按独立代码内容处理。见 F07 |
+| `heading-case` 标题 sentence case            | 当前自有文案符合                       | 中文标题没有英文 title case 问题；ASCS 是产品名。用户 Markdown 标题不作为产品文案审查         |
+| `font-tracking` 不改变字距                   | 当前符合                               | 自有页面未发现 `tracking-*` 或 `letter-spacing`                                               |
+| `font-weight` 不使用 `font-bold`             | 源码已符合                             | 未发现自有页面使用 `font-bold`；空状态标题已统一为 semibold。见 F21                           |
+| `related-text-spacing` 相关文本更靠近        | 源码已调整，待人工复核                 | 空状态和弹窗标题/说明已分组，操作区保留更大的组间距。见 F02、F21                              |
+| `text-spacing` 文本周围光学间距              | 源码已调整，待人工复核                 | 弹窗、通知、复制块和预览区已分别使用垂直略小于水平的内距。见 F21                              |
+| `hover-color-transitions` hover 色立即变化   | 当前页面已符合                         | 已检查的页面没有颜色过渡；遗留的 `header-user.tsx` 也已移除 `transition-colors`。             |
+| `shadow-borders` 阴影配 ring                 | 当前符合                               | 自有有 border 的面板没有同时添加投影；Kumo Dialog/Button 使用 ring                            |
+| `concentric-border-radius` 同心圆角          | 需视觉复核                             | 没有发现明确的自定义近距离嵌套圆角错误；先修复 Dialog 内边距，再验证外框与控件距离            |
+| `icon-alignment` 图标对齐第一行              | 源码已调整，待人工复核                 | 通知条、回复目标和相关多行文本已使用首行 line-height 容器。见 F21                             |
+| `inline-monospace-size` 行内等宽字缩小       | 源码已符合，待人工复核                 | DNS 主机名和嵌入代码说明中的行内 code 已使用约 0.9em；独立代码块仍使用独立字号。见 F21        |
+| `sticky-borders` sticky 元素有分隔线         | 当前符合                               | 桌面 sidebar 有右边框，移动端转静态并有下边框                                                 |
+| `collapse-content-size` 折叠动画维持内容尺寸 | 当前无适用动画                         | 回复采用即时挂载/卸载，没有 width/height 折叠动画；不能据此宣称动画已验证                     |
+| `layer-card-nesting` 不嵌套 LayerCard        | 当前符合                               | 自有页面没有叠加嵌套 LayerCard；Dialog 内部使用 LayerCard 属于组件实现                        |
+| `dialog-rendering` Dialog 保持挂载           | 当前符合                               | 添加站点、删除、封禁、登录都通过 `Dialog.Root open` 控制，没有 `open && <Dialog>` 模式        |
 
 Kumo 2.14.0 的主题明确设置 `--text-base: 14px`、`--text-sm: 13px`、`--text-xs: 12px`。因此“用了 Kumo”或“根字号为 14px”都不能保证所有正文符合 14px。全局未分层的 `font: inherit` 还会影响控件工具类的最终结果，后续调整需要检查 computed style。
 
@@ -134,12 +133,12 @@ Kumo 2.14.0 的主题明确设置 `--text-base: 14px`、`--text-sm: 13px`、`--t
 
 **位置：** [styles.css:67](/mnt/d/dev/ascs/src/styles.css:67)、[styles.css:71](/mnt/d/dev/ascs/src/styles.css:71)、[styles.css:82](/mnt/d/dev/ascs/src/styles.css:82)。
 
-| 文本 | 声明前景/背景 | 对比度 | 判断 |
-| --- | --- | --- | --- |
-| 普通 muted 文字 | `#72767e` / `#fff` | 4.56:1 | 这一组合达到 4.5:1，不能把所有灰字都判为失败 |
-| 文章链接 | `#797f86` / `#fff` | 4.04:1 | 未达到普通文本 4.5:1 |
-| 后台页脚 | `#8b9096` / `#fff` | 3.22:1 | 未达到普通文本 4.5:1 |
-| 默认深色 Markdown 链接 | `#267265` / `#191b1e` | 3.02:1 | 未达到普通文本 4.5:1 |
+| 文本                   | 声明前景/背景         | 对比度 | 判断                                         |
+| ---------------------- | --------------------- | ------ | -------------------------------------------- |
+| 普通 muted 文字        | `#72767e` / `#fff`    | 4.56:1 | 这一组合达到 4.5:1，不能把所有灰字都判为失败 |
+| 文章链接               | `#797f86` / `#fff`    | 4.04:1 | 未达到普通文本 4.5:1                         |
+| 后台页脚               | `#8b9096` / `#fff`    | 3.22:1 | 未达到普通文本 4.5:1                         |
+| 默认深色 Markdown 链接 | `#267265` / `#191b1e` | 3.02:1 | 未达到普通文本 4.5:1                         |
 
 **建议：** 优先使用有明暗主题语义的 `text-kumo-link`、`text-kumo-subtle` 等 token；为 `data-accent` 自定义色设计单独的链接与焦点策略，不能假定任意六位十六进制色都可读。文字以外的焦点边框应按对应非文本标准单独检查。
 

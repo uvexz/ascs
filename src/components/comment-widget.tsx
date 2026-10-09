@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Input } from '@cloudflare/kumo'
+import { Button, Input, LinkButton } from '@cloudflare/kumo'
 import {
   ArrowBendUpLeftIcon,
   ArrowRightIcon,
   EyeIcon,
+  GearSixIcon,
   HeartIcon,
   SignInIcon,
   SignOutIcon,
   XIcon,
   ChatCircleIcon,
-  ArrowSquareOutIcon,
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../lib/api'
 import { authClient } from '../lib/auth-client'
@@ -78,20 +78,10 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
   useEffect(() => {
     replyRef.current = reply
   }, [reply])
-  const standaloneLogin =
-    typeof window !== 'undefined' &&
-    window.parent === window &&
-    new URLSearchParams(window.location.search).get('login') === '1'
-  useEffect(() => {
-    if (standaloneLogin) setAuthOpen(true)
-  }, [standaloneLogin])
+  const embedded =
+    typeof window !== 'undefined' && window.parent !== window
   function openLogin() {
-    if (window.parent !== window) {
-      const target = new URL(window.location.href)
-      target.searchParams.set('login', '1')
-      const opened = window.open(target.href, '_blank', 'noopener,noreferrer')
-      if (!opened) setError('浏览器阻止了登录窗口，请允许弹出窗口后重试。')
-    } else setAuthOpen(true)
+    setAuthOpen(true)
   }
   const theme = options.theme || config.data?.theme || 'auto'
   useEffect(() => {
@@ -228,21 +218,23 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
               name={session.data.user.name}
               image={session.data.user.image}
             />
-            <a
-              href="/profile"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-link inline-flex min-w-0 items-center gap-1"
-              title={`${session.data.user.name} · 个人设置（在新窗口打开）`}
-              aria-label={`${session.data.user.name}，个人设置（在新窗口打开）`}
+            <span
+              className="truncate min-w-0 font-medium"
+              title={session.data.user.name}
             >
-              <span className="truncate">{session.data.user.name}</span>
-              <ArrowSquareOutIcon
-                size={14}
-                className="shrink-0"
-                aria-hidden="true"
-              />
-            </a>
+              {session.data.user.name}
+            </span>
+            <LinkButton
+              href="/profile"
+              external
+              shape="square"
+              variant="ghost"
+              aria-label="个人设置"
+              title="个人设置"
+              className="shrink-0"
+            >
+              <GearSixIcon size={17} />
+            </LinkButton>
             <Button
               shape="square"
               variant="ghost"
@@ -316,32 +308,41 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
             </div>
           )}
           {!session.data && (
-            <div className="anonymous-fields">
-              <Input
-                label="昵称"
-                name="author"
-                required
-                maxLength={60}
-                autoComplete="nickname"
-                disabled={formDisabled}
-              />
-              <Input
-                label="邮箱（不公开）"
-                description="仅用于通知和防止重复提交，不会展示给其他人。"
-                name="email"
-                type="email"
-                required
-                maxLength={254}
-                autoComplete="email"
-                disabled={formDisabled}
-              />
-            </div>
+            <>
+              <div className="anonymous-fields">
+                <Input
+                  label="昵称"
+                  name="author"
+                  required
+                  maxLength={60}
+                  autoComplete="nickname"
+                  disabled={formDisabled}
+                />
+                <Input
+                  label="邮箱（不公开）"
+                  name="email"
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="email"
+                  disabled={formDisabled}
+                />
+              </div>
+              <p className="anonymous-hint text-muted">
+                邮箱仅用于接收回复通知和防止重复提交，不会展示给其他人。
+              </p>
+            </>
           )}
           <label className="sr-only" htmlFor="comment-text">
             评论内容
           </label>
           {preview ? (
-            <div className="preview" tabIndex={0} aria-label="评论预览">
+            <div
+              className="preview"
+              role="region"
+              tabIndex={0}
+              aria-label="评论预览"
+            >
               <Markdown>{text || ' '}</Markdown>
             </div>
           ) : (
@@ -482,18 +483,32 @@ export function CommentWidget({ options }: { options: WidgetOptions }) {
           <img src="/brand.svg" alt="" width="16" height="16" />
           ASCS
         </a>
+        <nav className="footer-links" aria-label="法务信息">
+          <a
+            className="text-link"
+            href="/tos"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            服务条款
+          </a>
+          <a
+            className="text-link"
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            隐私声明
+          </a>
+        </nav>
       </footer>
       <AppDialog
         open={authOpen}
         onOpenChange={setAuthOpen}
         title="登录 ASCS"
-        description={
-          standaloneLogin
-            ? '登录完成后请返回原文章窗口继续评论。'
-            : '登录后可以使用账号发表评论、回复和点赞。'
-        }
+        description="登录后可以使用账号发表评论、回复和点赞。"
       >
-        <AuthForm compact />
+        <AuthForm compact inFrame={embedded} />
       </AppDialog>
     </main>
   )
