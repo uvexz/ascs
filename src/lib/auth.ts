@@ -15,11 +15,29 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 10,
     maxPasswordLength: 128,
+    // Unverified sign-ups cannot sign in, so an attacker cannot pre-register a
+    // victim's address and keep that account. Changing a password also ends
+    // every existing session, including any the attacker already holds.
+    requireEmailVerification: true,
+    revokeSessionsOnPasswordReset: true,
     sendResetPassword: async ({ user, url }) => {
       await enqueueMail(
         user.email,
         '重置账号密码',
         `请打开以下链接重置密码：\n${url}\n如果这不是你的操作，请忽略此邮件。`,
+      )
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    // Existing accounts created before verification was required get a fresh
+    // link the next time they try to sign in.
+    sendOnSignIn: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await enqueueMail(
+        user.email,
+        '验证你的邮箱',
+        `请打开以下链接验证邮箱并完成注册：\n${url}\n如果这不是你的操作，请忽略此邮件。`,
       )
     },
   },
@@ -119,6 +137,8 @@ export const auth = betterAuth({
     },
   },
   account: {
+    // Provider access and id tokens are encrypted at rest with the auth secret.
+    encryptOAuthTokens: true,
     accountLinking: {
       enabled: true,
       disableImplicitLinking: true,

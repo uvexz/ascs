@@ -120,7 +120,14 @@ export function bearerToken(request: Request) {
   return /^bearer /i.test(header) ? header.slice(7).trim() : ''
 }
 export async function getSession(request: Request) {
-  const session = await auth.api.getSession({ headers: request.headers })
+  // Bearer sessions are the short-lived widget credentials. Their lifetime is
+  // fixed at mint time, so they must never be slid forward by Better Auth's
+  // 7-day refresh window.
+  const widget = !!bearerToken(request)
+  const session = await auth.api.getSession({
+    headers: request.headers,
+    query: { disableRefresh: widget },
+  })
   if (!session) return null
   const person = await db
     .select()

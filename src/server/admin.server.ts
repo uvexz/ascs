@@ -26,6 +26,7 @@ import {
   sites,
   systemSettings,
   user,
+  verification,
 } from '../db/schema'
 import {
   adminListInput,
@@ -285,9 +286,16 @@ export async function handleAdmin(request: Request, path: string[]) {
         '配置已被其他管理员更新，请刷新后重试',
       )
       const settings = systemSettingsInput.parse(input)
+      // A stored password is only reused while the destination stays the same;
+      // otherwise an admin could point SMTP at their own host and receive it.
+      const endpointChanged =
+        settings.smtp.host !== current.settings.smtp.host ||
+        settings.smtp.port !== current.settings.smtp.port ||
+        settings.smtp.username !== current.settings.smtp.username
       settings.smtp.password = settings.smtp.clearPassword
         ? ''
-        : settings.smtp.password || current.settings.smtp.password
+        : settings.smtp.password ||
+          (endpointChanged ? '' : current.settings.smtp.password)
       delete settings.smtp.clearPassword
       check(
         !settings.smtp.enabled ||
@@ -403,7 +411,14 @@ export async function handleAdmin(request: Request, path: string[]) {
         await tx
           .delete(bans)
           .where(and(eq(bans.kind, 'user'), eq(bans.value, target)))
-        await tx.delete(mailQueue).where(eq(mailQueue.to, person.email))
+        // Unsent mail and email-bound verification tokens belong to the account and
+        // must not outlive it; sent-mail history is kept for the audit trail.
+        await tx
+          .delete(mailQueue)
+          .where(and(eq(mailQueue.to, person.email), isNull(mailQueue.sentAt)))
+        await tx
+          .delete(verification)
+          .where(eq(verification.identifier, person.email))
         await tx.delete(user).where(eq(user.id, target))
         await tx.insert(auditLogs).values(audit(actor, 'user.delete', target))
       })

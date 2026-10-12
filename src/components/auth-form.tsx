@@ -69,8 +69,14 @@ export function AuthForm({
                 redirectTo: `${window.location.origin}/reset-password`,
               })
             : await authClient.signIn.email({ email, password })
+      if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
+        setNotice('邮箱尚未验证，验证邮件已重新发送，请打开邮件中的链接。')
+        return
+      }
       if (result.error) throw new Error(result.error.message || '认证失败')
       if (mode === 'reset') setNotice('若账号存在，重置链接将发送到你的邮箱。')
+      else if (mode === 'signup')
+        setNotice('验证邮件已发送，请打开邮件中的链接完成注册后再登录。')
       else {
         resetAuthCaches(queryClient)
         // Re-run route guards so the admin shell reacts to the new session.

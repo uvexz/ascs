@@ -16,7 +16,7 @@ ASCS（A Simple Comment System）是一个面向多站点博客的评论服务�
 
 ## 本地运行
 
-需要 Node.js 20+ 或 Bun。
+需要 Node.js 22.12+（推荐 24，与 `.nvmrc`、Docker 镜像一致）或 Bun。
 
 ```bash
 cp .env.example .env.local
@@ -83,7 +83,7 @@ bun run dev
 - `TRUSTED_IP_HEADER`：只有反向代理会覆盖此 header 时才设置，用于限流和封禁 IP
 - `ALLOW_LOCALHOST_SITE`：仅开发环境，允许创建 localhost 站点并跳过 DNS 验证
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`：可选 OAuth（`MICROSOFT_TENANT_ID` 可选，默认 `common`）
-- `SMTP_URL`、`MAIL_FROM`：可选 SMTP；站点邮件写入 outbox，由 cron 或 VPS 定时任务发送
+- `SMTP_URL`、`MAIL_FROM`：SMTP；注册需要邮箱验证，因此正式环境必须配置。站点邮件与验证邮件写入 outbox，由 cron 或 VPS 定时任务发送
 - `CRON_SECRET`：至少 32 字符，用于 `/api/v1/cron/mail`
 - `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`：仅 `admin:init` 使用的一次性管理员初始化变量
 

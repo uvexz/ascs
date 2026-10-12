@@ -99,11 +99,6 @@ export async function flushMail() {
         text: mail.body,
         messageId: `<${mail.id}@ascs.local>`,
       })
-      await db
-        .update(mailQueue)
-        .set({ sentAt: Date.now(), leaseUntil: 0, lastError: null })
-        .where(and(eq(mailQueue.id, mail.id), eq(mailQueue.leaseToken, token)))
-      sent++
     } catch {
       await db
         .update(mailQueue)
@@ -113,7 +108,16 @@ export async function flushMail() {
           availableAt: Date.now() + 60_000 * 2 ** mail.attempts,
         })
         .where(and(eq(mailQueue.id, mail.id), eq(mailQueue.leaseToken, token)))
+      continue
     }
+    // The message has been delivered: record it outside the send try block so a
+    // bookkeeping failure can never re-queue it. Clearing the body drops one-time
+    // links (password reset, email change) that must not stay in the database.
+    await db
+      .update(mailQueue)
+      .set({ sentAt: Date.now(), leaseUntil: 0, lastError: null, body: '' })
+      .where(and(eq(mailQueue.id, mail.id), eq(mailQueue.leaseToken, token)))
+    sent++
   }
   transport.close()
   await db

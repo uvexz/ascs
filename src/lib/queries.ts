@@ -26,11 +26,16 @@ function toResult(error: unknown): {
   status: number
   message: string
 } {
+  const status = statusOf(error)
+  // Only deliberate HTTP errors carry user-facing text; anything else (database,
+  // parser or runtime failures) is logged on the server and shown generically.
   return {
     ok: false,
-    status: statusOf(error) ?? 500,
+    status: status ?? 500,
     message:
-      error instanceof Error ? error.message : '服务暂时不可用，请稍后重试。',
+      status !== undefined && error instanceof Error
+        ? error.message
+        : '服务暂时不可用，请稍后重试。',
   }
 }
 

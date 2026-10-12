@@ -24,6 +24,20 @@ function WidgetLogin() {
       : new URLSearchParams(window.location.search).get('state') || ''
 
   const relay = useCallback(async () => {
+    // Verify the opener before minting a session, so a foreign page that opens
+    // this window cannot create a dangling widget session for the user.
+    let sameOrigin = false
+    try {
+      sameOrigin =
+        !!window.opener &&
+        window.opener.location.origin === window.location.origin
+    } catch {
+      sameOrigin = false
+    }
+    if (!sameOrigin) {
+      setError('请从评论区打开登录窗口后重试。')
+      return
+    }
     setStatus('busy')
     setError('')
     try {
@@ -32,19 +46,10 @@ function WidgetLogin() {
         body: {},
         skipAuth: true,
       })
-      let sameOrigin = false
-      try {
-        sameOrigin =
-          !!window.opener &&
-          window.opener.location.origin === window.location.origin
-      } catch {
-        sameOrigin = false
-      }
-      if (sameOrigin)
-        window.opener.postMessage(
-          { type: 'ascs:widget-session', state, token: result.token },
-          window.location.origin,
-        )
+      window.opener.postMessage(
+        { type: 'ascs:widget-session', state, token: result.token },
+        window.location.origin,
+      )
       setStatus('done')
       window.setTimeout(() => window.close(), 400)
     } catch (errorValue) {

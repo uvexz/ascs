@@ -8,15 +8,19 @@ export function Markdown({ children }: { children: string }) {
         remarkPlugins={[remarkGfm]}
         skipHtml
         components={{
-          a: ({ children: content, href }) => (
-            <a
-              href={href}
-              rel="nofollow noopener noreferrer ugc"
-              target="_blank"
-            >
-              {content}
-            </a>
-          ),
+          a: ({ children: content, href }) =>
+            href ? (
+              <a
+                href={href}
+                rel="nofollow noopener noreferrer ugc"
+                target="_blank"
+              >
+                {content}
+              </a>
+            ) : (
+              // react-markdown blanks unsafe protocols such as javascript:.
+              <span>{content}</span>
+            ),
           img: ({ alt }) => (
             <span className="text-muted">[图片：{alt || '图片'}]</span>
           ),

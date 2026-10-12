@@ -369,8 +369,17 @@ async function toggleLike(request: Request) {
       .where(
         and(eq(likes.commentId, comment.id), eq(likes.voter, identity.voter)),
       )
+  // Report the stored state, not the branch taken, so concurrent clicks cannot
+  // leave the client showing a like that no longer exists (or the reverse).
+  const [current] = await db
+    .select({ voter: likes.voter })
+    .from(likes)
+    .where(
+      and(eq(likes.commentId, comment.id), eq(likes.voter, identity.voter)),
+    )
+    .limit(1)
   return json(
-    { liked: !!inserted.length },
+    { liked: !!current },
     200,
     identity.cookie ? { 'Set-Cookie': identity.cookie } : {},
   )
@@ -764,23 +773,30 @@ async function manageSite(request: Request, siteId: string, action?: string) {
       .where(and(eq(members.siteId, siteId), eq(members.userId, person.id)))
       .limit(1)
     check(!existing.length, 409, '用户已是成员；修改角色请先移除')
-    if (input.role === 'owner') {
-      check(!person.disabled, 400, '该用户已停用')
-      if (!(await isAdmin(person.id))) {
-        const [owned] = await db
-          .select({ count: sql<number>`count(*)` })
-          .from(members)
-          .where(and(eq(members.userId, person.id), eq(members.role, 'owner')))
-        check(
-          owned.count < person.siteLimit,
-          400,
-          '该用户站点额度不足，请先调整额度',
-        )
+    // Quota check and insert share a transaction so concurrent grants cannot
+    // both pass the same remaining-quota count.
+    const personIsAdmin = input.role === 'owner' && (await isAdmin(person.id))
+    await db.transaction(async (tx) => {
+      if (input.role === 'owner') {
+        check(!person.disabled, 400, '该用户已停用')
+        if (!personIsAdmin) {
+          const [owned] = await tx
+            .select({ count: sql<number>`count(*)` })
+            .from(members)
+            .where(
+              and(eq(members.userId, person.id), eq(members.role, 'owner')),
+            )
+          check(
+            owned.count < person.siteLimit,
+            400,
+            '该用户站点额度不足，请先调整额度',
+          )
+        }
       }
-    }
-    await db
-      .insert(members)
-      .values({ siteId, userId: person.id, role: input.role })
+      await tx
+        .insert(members)
+        .values({ siteId, userId: person.id, role: input.role })
+    })
     return json({ ok: true })
   }
   if (action === 'members' && request.method === 'DELETE') {

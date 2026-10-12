@@ -39,6 +39,8 @@ export function Thread({
   const [likes, setLikes] = useState(comment.likes)
   useEffect(() => setLiked(comment.liked), [comment.liked])
   useEffect(() => setLikes(comment.likes), [comment.likes])
+  // Changing the sort reuses this mounted thread, so restart its reply paging.
+  useEffect(() => setPage(1), [sort])
   useEffect(() => {
     if (expandPath.includes(comment.id)) setExpanded(true)
   }, [comment.id, expandPath])
@@ -117,7 +119,7 @@ export function Thread({
               <>
                 <Button
                   variant="ghost"
-                  aria-label={liked ? '取消点赞' : '点赞'}
+                  aria-label={`点赞，${likes} 人`}
                   aria-pressed={liked}
                   loading={like.isPending}
                   onClick={() => like.mutate()}

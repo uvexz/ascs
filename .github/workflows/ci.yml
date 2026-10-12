@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -16,7 +19,9 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run generate-routes
+      - run: git diff --exit-code
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run check
       - run: npm run build
+      - run: docker build --tag ascs-ci .
