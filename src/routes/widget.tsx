@@ -13,6 +13,7 @@ const search = z.object({
     .string()
     .regex(/^#[0-9a-f]{6}$/i)
     .optional(),
+  border: z.literal('true').optional(),
 })
 export const Route = createFileRoute('/widget')({
   ssr: false,

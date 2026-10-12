@@ -16,6 +16,8 @@
     url.searchParams.set('theme', script.dataset.theme)
   if (/^#[0-9a-f]{6}$/i.test(script.dataset.accent || ''))
     url.searchParams.set('accent', script.dataset.accent)
+  if ('border' in script.dataset && script.dataset.border !== 'false')
+    url.searchParams.set('border', 'true')
   var status = document.createElement('p')
   status.textContent = '正在加载评论…'
   status.setAttribute('role', 'status')

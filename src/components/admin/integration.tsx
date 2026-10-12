@@ -79,11 +79,49 @@ export function Integration({ detail }: { detail: SiteDetail }) {
       <section className="settings-section">
         <h2>嵌入代码</h2>
         <p className="section-description">
-          默认使用站点设置中的主题。若要固定主题，可在复制后手动加入{' '}
-          <code className="inline-code">data-theme</code> 属性。
+          将代码放在文章模板中希望显示评论的位置。
         </p>
         <CopyBlock
           text={`<div id="ascs-comments"></div>\n<script src="${origin}/embed.js"\n  data-site="${detail.site.id}"\n  data-target="ascs-comments"\n  defer></script>`}
+        />
+      </section>
+      <section className="settings-section">
+        <h2>自定义样式</h2>
+        <p className="section-description">
+          评论区运行在独立的 iframe 中，博客 CSS 无法直接修改其样式。可在 script
+          标签上添加以下属性调整外观。
+        </p>
+        <dl className="definition-list">
+          <div>
+            <dt>
+              <code>data-theme</code>
+            </dt>
+            <dd>
+              <code>auto</code>（跟随系统）、<code>light</code>（浅色）或{' '}
+              <code>dark</code>（深色）。设置后覆盖站点设置中的主题。
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <code>data-accent</code>
+            </dt>
+            <dd>
+              6 位十六进制颜色，例如 <code>#267265</code>
+              。作用于主要按钮和复选框，请选择与白色文字对比足够的颜色。
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <code>data-border</code>
+            </dt>
+            <dd>
+              为评论区添加边框和圆角，默认无边框。添加该属性即可开启，设为{' '}
+              <code>false</code> 则关闭。
+            </dd>
+          </div>
+        </dl>
+        <CopyBlock
+          text={`<div id="ascs-comments"></div>\n<script src="${origin}/embed.js"\n  data-site="${detail.site.id}"\n  data-target="ascs-comments"\n  data-theme="auto"\n  data-accent="#267265"\n  data-border\n  defer></script>`}
         />
       </section>
       <section className="settings-section">

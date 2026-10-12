@@ -17,6 +17,7 @@ export type WidgetOptions = {
   pageKey?: string
   theme?: 'auto' | 'light' | 'dark'
   accent?: string
+  border?: 'true'
 }
 
 export function Thread({

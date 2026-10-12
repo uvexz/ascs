@@ -734,6 +734,10 @@ input[type='checkbox'] {
   color: var(--text-color-kumo-default, #30343a);
   background: var(--color-kumo-base, #fff);
 }
+.widget[data-border] {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
 .widget-heading {
   display: flex;
   justify-content: space-between;

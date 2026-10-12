@@ -308,13 +308,13 @@ function Widget({
   })
   if (config.isPending)
     return (
-      <main className="widget" role="status">
+      <main className="widget" data-border={options.border} role="status">
         正在加载评论…
       </main>
     )
   if (config.error)
     return (
-      <main className="widget">
+      <main className="widget" data-border={options.border}>
         <QueryError error={config.error} retry={config.refetch} />
       </main>
     )
@@ -323,9 +323,14 @@ function Widget({
     <main
       className="widget"
       data-mode={mode}
+      data-border={options.border}
       style={
         options.accent && /^#[0-9a-f]{6}$/i.test(options.accent)
-          ? ({ '--accent': options.accent } as React.CSSProperties)
+          ? ({
+              '--accent': options.accent,
+              '--color-kumo-brand': options.accent,
+              '--color-kumo-brand-hover': `color-mix(in srgb, ${options.accent}, black 15%)`,
+            } as React.CSSProperties)
           : undefined
       }
     >
