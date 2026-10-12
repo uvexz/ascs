@@ -23,7 +23,7 @@ export function Integration({ detail }: { detail: SiteDetail }) {
   const hostname = new URL(detail.site.origin).hostname
   return (
     <>
-      {detail.role === 'owner' && (
+      {detail.role === 'owner' && !detail.site.verifiedAt && (
         <section className="settings-section">
           <div className="section-heading">
             <h2>域名验证</h2>
