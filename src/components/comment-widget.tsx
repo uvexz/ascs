@@ -31,6 +31,7 @@ type Config = {
   allowAnonymous: boolean
   theme: 'auto' | 'light' | 'dark'
   challenge: string
+  captcha: string | null
 }
 
 type WidgetSession = {
@@ -392,6 +393,7 @@ function Widget({
           options={options}
           session={session}
           challenge={config.data.challenge}
+          captcha={config.data.captcha}
           formDisabled={formDisabled}
           send={send}
           reply={reply}

@@ -113,6 +113,8 @@ export const commentInput = pageInput.extend({
   // separate from any real profile field so bot traffic cannot alias into one.
   honeypot: z.string().max(200).default(''),
   challenge: z.string().min(1).max(200),
+  // Cap token; required only when CAP_SITE and CAP_KEY are configured.
+  captchaToken: z.string().min(1).max(4096).optional(),
 })
 export const moderationInput = z.object({
   commentId: id,

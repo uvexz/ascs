@@ -4,6 +4,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { AUTH_PROVIDERS } from './auth-providers'
+import { Captcha } from './captcha'
 import { authClient } from '../lib/auth-client'
 import { api, errorText, fieldError } from '../lib/api'
 import { resetAuthCaches } from '../lib/cache'
@@ -25,6 +26,8 @@ export function AuthForm({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<unknown>(null)
   const [notice, setNotice] = useState('')
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
   const providers = useQuery({
     queryKey: queryKeys.authConfig(),
     staleTime: staleTimes.static,
@@ -35,8 +38,11 @@ export function AuthForm({
         microsoft: boolean
         name: string
         allowRegistration: boolean
+        captcha: string | null
       }>('auth-config'),
   })
+  // Sign-up is not behind Cap; sign-in and password reset are.
+  const captcha = providers.data?.captcha ?? null
   useEffect(() => {
     if (providers.data)
       document.title = `${providers.data.name} · ${mode === 'signup' ? '注册' : mode === 'reset' ? '重置密码' : '登录'}`
@@ -49,6 +55,14 @@ export function AuthForm({
   }, [mode])
   async function submit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (captcha && !captchaToken) {
+      setError(new Error('请完成人机验证'))
+      return
+    }
+    // Cap tokens are single-use; consume this one and start a fresh challenge.
+    const headers = captcha ? { 'x-cap-token': captchaToken! } : undefined
+    setCaptchaToken(null)
+    setCaptchaKey((key) => key + 1)
     setBusy(true)
     setError(null)
     setNotice('')
@@ -64,11 +78,14 @@ export function AuthForm({
               name: String(form.get('name')),
             })
           : mode === 'reset'
-            ? await authClient.requestPasswordReset({
-                email,
-                redirectTo: `${window.location.origin}/reset-password`,
-              })
-            : await authClient.signIn.email({ email, password })
+            ? await authClient.requestPasswordReset(
+                {
+                  email,
+                  redirectTo: `${window.location.origin}/reset-password`,
+                },
+                { headers },
+              )
+            : await authClient.signIn.email({ email, password }, { headers })
       if (result.error?.code === 'EMAIL_NOT_VERIFIED') {
         setNotice('邮箱尚未验证，验证邮件已重新发送，请打开邮件中的链接。')
         return
@@ -181,6 +198,13 @@ export function AuthForm({
             error={fieldError(error, 'password')}
           />
         )}
+        {captcha && (
+          <Captcha
+            key={captchaKey}
+            endpoint={captcha}
+            onToken={setCaptchaToken}
+          />
+        )}
         {error != null && (
           <p role="alert" className="error-box">
             {errorText(error)}
@@ -191,7 +215,12 @@ export function AuthForm({
             {notice}
           </p>
         )}
-        <Button type="submit" variant="primary" loading={busy}>
+        <Button
+          type="submit"
+          variant="primary"
+          loading={busy}
+          disabled={!!captcha && !captchaToken}
+        >
           {mode === 'signup'
             ? '创建账号'
             : mode === 'reset'

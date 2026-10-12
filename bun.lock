@@ -15,6 +15,7 @@
         "@types/nodemailer": "^8.0.2",
         "better-auth": "^1.5.3",
         "blobatar": "^2.7.0",
+        "cap-widget": "^0.1.58",
         "dotenv": "^17.3.1",
         "drizzle-orm": "^0.45.1",
         "nitro": "3.0.260610-beta",
@@ -577,6 +578,8 @@
     "callsites": ["callsites@3.1.0", "https://registry.npmmirror.com/callsites/-/callsites-3.1.0.tgz", {}, "sha512-P8BjAsXvZS+VIDUI11hHCQEv74YT67YUi5JJFNWIqL235sBmjX4+qx9Muvls5ivyNENctx46xQLQ3aTuE7ssaQ=="],
 
     "caniuse-lite": ["caniuse-lite@1.0.30001815", "https://registry.npmmirror.com/caniuse-lite/-/caniuse-lite-1.0.30001815.tgz", {}, "sha512-uDybUEyfgbyJJ93J1vikTylBX31AkdVYeVPeffMQpf8XN7hSfr0oZOn4VFOIMNvtU5+rHvC5Udg2TgtJKHm23Q=="],
+
+    "cap-widget": ["cap-widget@0.1.58", "", {}, "sha512-7iS/Q++AaiVvWR8xvMSxRwGWY+fV1ZADJNwPzLk4P1gibCmCbS5G6MGOtoUjsj9OxI9+0nkewW6gRsOGDCOZZA=="],
 
     "ccount": ["ccount@2.0.1", "https://registry.npmmirror.com/ccount/-/ccount-2.0.1.tgz", {}, "sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg=="],
 

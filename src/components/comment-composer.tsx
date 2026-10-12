@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Button, Input } from '@cloudflare/kumo'
 import {
   ArrowBendUpLeftIcon,
@@ -5,6 +6,7 @@ import {
   EyeIcon,
   XIcon,
 } from '@phosphor-icons/react'
+import { Captcha } from './captcha'
 import { Markdown } from './markdown'
 import type { RefObject } from 'react'
 import type { UseMutationResult } from '@tanstack/react-query'
@@ -16,6 +18,7 @@ export function CommentComposer({
   options,
   session,
   challenge,
+  captcha,
   formDisabled,
   send,
   reply,
@@ -30,6 +33,7 @@ export function CommentComposer({
   options: WidgetOptions
   session: { data: { user: { name: string } } | null }
   challenge: string
+  captcha: string | null
   formDisabled: boolean
   send: UseMutationResult<unknown, Error, Record<string, unknown>>
   reply: ReplyTarget
@@ -41,12 +45,18 @@ export function CommentComposer({
   editorRef: RefObject<HTMLTextAreaElement | null>
   onSubmitStart: () => void
 }) {
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
   return (
     <form
       className="comment-form"
       onSubmit={(event) => {
         event.preventDefault()
         onSubmitStart()
+        // Cap tokens are single-use; consume this one and start a fresh challenge.
+        const token = captchaToken
+        setCaptchaToken(null)
+        setCaptchaKey((key) => key + 1)
         const form = new FormData(event.currentTarget)
         send.mutate({
           ...options,
@@ -58,6 +68,7 @@ export function CommentComposer({
           email: session.data ? undefined : String(form.get('email')),
           honeypot: String(form.get('website') || ''),
           challenge,
+          captchaToken: token ?? undefined,
         })
       }}
     >
@@ -135,6 +146,13 @@ export function CommentComposer({
           aria-describedby="comment-help"
         />
       )}
+      {captcha && (
+        <Captcha
+          key={captchaKey}
+          endpoint={captcha}
+          onToken={setCaptchaToken}
+        />
+      )}
       <div className="honeypot" aria-hidden="true">
         <label htmlFor="website">Website</label>
         <input id="website" name="website" tabIndex={-1} autoComplete="off" />
@@ -161,7 +179,9 @@ export function CommentComposer({
             type="submit"
             variant="primary"
             icon={ArrowRightIcon}
-            disabled={!text.trim() || formDisabled}
+            disabled={
+              !text.trim() || formDisabled || (!!captcha && !captchaToken)
+            }
             loading={send.isPending}
           >
             发布评论

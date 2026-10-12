@@ -1,12 +1,23 @@
 import { betterAuth, APIError } from 'better-auth'
+import { createAuthMiddleware } from 'better-auth/api'
 import { bearer } from 'better-auth/plugins/bearer'
 import { eq } from 'drizzle-orm'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { db } from '../db'
 import * as schema from '../db/schema'
+import { captchaFailure } from '../server/captcha.server'
 import { enqueueMail } from '../server/mail.server'
 import { readSettings } from '../server/settings.server'
 import { profileInput } from './validation'
+
+// Endpoints that accept an unauthenticated email or password guess. The Cap
+// token travels in `x-cap-token`, so the password check never runs without it.
+const CAPTCHA_PATHS = new Set([
+  '/sign-up/email',
+  '/sign-in/email',
+  '/request-password-reset',
+  '/forget-password',
+])
 
 export const auth = betterAuth({
   appName: 'ASCS',
@@ -147,6 +158,17 @@ export const auth = betterAuth({
     },
   },
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (!CAPTCHA_PATHS.has(ctx.path)) return
+      const failure = await captchaFailure(ctx.headers?.get('x-cap-token'))
+      if (failure)
+        throw new APIError(
+          failure.status === 503 ? 'SERVICE_UNAVAILABLE' : 'BAD_REQUEST',
+          { message: failure.message },
+        )
+    }),
+  },
   rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },
   plugins: [bearer()],
   advanced: {

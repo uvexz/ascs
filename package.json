@@ -35,6 +35,7 @@
     "@types/nodemailer": "^8.0.2",
     "better-auth": "^1.5.3",
     "blobatar": "^2.7.0",
+    "cap-widget": "^0.1.58",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.45.1",
     "nitro": "3.0.260610-beta",

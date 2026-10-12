@@ -45,6 +45,7 @@ import {
   verifyChallenge,
   voterIdentity,
 } from './security.server'
+import { captchaEndpoint, captchaFailure } from './captcha.server'
 import { flushMail } from './mail.server'
 import { handleAdmin } from './admin.server'
 import { publicSettings } from './settings.server'
@@ -240,6 +241,8 @@ async function createComment(request: Request) {
   await limit(`comment-global:${ip}`, 40, 3_600_000)
   verifyChallenge(input.challenge, site.id, pageKey)
   check(!input.honeypot, 400, '评论未通过垃圾检测')
+  const failure = await captchaFailure(input.captchaToken)
+  if (failure) throw new HttpError(failure.status, failure.message)
   const session = await getSession(request)
   check(site.allowAnonymous || session, 401, '此站点需要登录后评论')
   check(session || (input.author && input.email), 400, '匿名评论需要昵称和邮箱')
@@ -880,6 +883,7 @@ export async function handleApi(request: Request) {
           allowAnonymous: context.site.allowAnonymous,
           theme: context.site.theme,
           challenge: challenge(context.site.id, context.pageKey),
+          captcha: captchaEndpoint(),
         },
         200,
         identity.cookie ? { 'Set-Cookie': identity.cookie } : {},
@@ -933,6 +937,7 @@ export async function handleApi(request: Request) {
           process.env.MICROSOFT_CLIENT_ID && process.env.MICROSOFT_CLIENT_SECRET
         ),
         email: true,
+        captcha: captchaEndpoint(),
         ...(await publicSettings()),
       })
     if (path[0] === 'sites' && !path[1] && request.method === 'GET')
