@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import type { RefObject } from 'react'
 import type { CapSolveEvent, CapWidget } from 'cap-widget'
 
 // React's JSX types are declared as a namespace; augmenting them is the only way
@@ -17,20 +18,29 @@ declare module 'react' {
 
 /**
  * Cap proof-of-work checkbox. Reports the solved token (or null after a reset)
- * through `onToken`. Tokens are single-use: callers should remount this
- * component via `key` after each submit so the next attempt solves fresh.
+ * through `onToken`. Tokens are single-use. Pass `widgetRef` and call
+ * `reset()` after each submit to reuse the element, which floating mode needs;
+ * otherwise remount via `key` to start a fresh challenge.
  */
 export function Captcha({
+  id,
   endpoint,
   onToken,
+  widgetRef,
 }: {
+  id?: string
   endpoint: string
   onToken: (token: string | null) => void
+  widgetRef?: RefObject<CapWidget | null>
 }) {
-  const ref = useRef<CapWidget>(null)
+  const internalRef = useRef<CapWidget>(null)
+  const ref = widgetRef ?? internalRef
   useEffect(() => {
-    // Loaded on the client only; the package registers <cap-widget> on import.
-    void import('cap-widget')
+    // Loaded on the client only, in order: the first registers <cap-widget>, the
+    // second attaches floating triggers (`data-cap-floating`) to the DOM.
+    void import('cap-widget').then(
+      () => import('cap-widget/cap-floating.min.js'),
+    )
   }, [])
   useEffect(() => {
     const widget = ref.current
@@ -43,9 +53,10 @@ export function Captcha({
       widget.removeEventListener('solve', solve)
       widget.removeEventListener('reset', reset)
     }
-  }, [onToken])
+  }, [onToken, ref])
   return (
     <cap-widget
+      id={id}
       ref={ref}
       data-cap-api-endpoint={endpoint}
       data-cap-i18n-initial-state="点击完成人机验证"

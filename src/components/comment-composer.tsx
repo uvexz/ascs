@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Button, Input } from '@cloudflare/kumo'
 import {
   ArrowBendUpLeftIcon,
@@ -9,6 +9,7 @@ import {
 import { Captcha } from './captcha'
 import { Markdown } from './markdown'
 import type { RefObject } from 'react'
+import type { CapWidget } from 'cap-widget'
 import type { UseMutationResult } from '@tanstack/react-query'
 import type { WidgetOptions } from './comment-thread'
 
@@ -46,17 +47,20 @@ export function CommentComposer({
   onSubmitStart: () => void
 }) {
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const [captchaKey, setCaptchaKey] = useState(0)
+  const captchaRef = useRef<CapWidget>(null)
+  // Floating mode finds the widget by a global selector, so the id must be unique.
+  const captchaId = `cap-${useId().replace(/[^\w-]/g, '')}`
   return (
     <form
       className="comment-form"
       onSubmit={(event) => {
         event.preventDefault()
         onSubmitStart()
-        // Cap tokens are single-use; consume this one and start a fresh challenge.
+        // Cap tokens are single-use; consume this one and reset the widget so the
+        // next click (floating mode) solves a fresh challenge.
         const token = captchaToken
         setCaptchaToken(null)
-        setCaptchaKey((key) => key + 1)
+        captchaRef.current?.reset()
         const form = new FormData(event.currentTarget)
         send.mutate({
           ...options,
@@ -148,9 +152,10 @@ export function CommentComposer({
       )}
       {captcha && (
         <Captcha
-          key={captchaKey}
+          id={captchaId}
           endpoint={captcha}
           onToken={setCaptchaToken}
+          widgetRef={captchaRef}
         />
       )}
       <div className="honeypot" aria-hidden="true">
@@ -179,9 +184,11 @@ export function CommentComposer({
             type="submit"
             variant="primary"
             icon={ArrowRightIcon}
-            disabled={
-              !text.trim() || formDisabled || (!!captcha && !captchaToken)
-            }
+            // Floating mode: clicking this button runs the Cap solve first and then
+            // submits, so it must stay enabled while no token is present.
+            data-cap-floating={captcha ? `#${captchaId}` : undefined}
+            data-cap-floating-position="top"
+            disabled={!text.trim() || formDisabled}
             loading={send.isPending}
           >
             发布评论
