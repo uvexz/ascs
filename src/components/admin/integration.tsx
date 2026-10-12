@@ -119,9 +119,26 @@ export function Integration({ detail }: { detail: SiteDetail }) {
               <code>false</code> 则关闭。
             </dd>
           </div>
+          <div>
+            <dt>
+              <code>data-background</code>
+            </dt>
+            <dd>
+              背景色或背景图片。颜色可写 <code>#rgb</code>、<code>#rrggbb</code>
+              ，或带透明通道的 <code>#rgba</code>、<code>#rrggbbaa</code>
+              ；图片填写 http/https 地址，会裁切铺满评论区。
+              透明度与该区域底层颜色混合。
+            </dd>
+          </div>
+          <div>
+            <dt>
+              <code>data-background-opacity</code>
+            </dt>
+            <dd>0 到 1 之间的小数，统一调整背景透明度，颜色和图片都适用。</dd>
+          </div>
         </dl>
         <CopyBlock
-          text={`<div id="ascs-comments"></div>\n<script src="${origin}/embed.js"\n  data-site="${detail.site.id}"\n  data-target="ascs-comments"\n  data-theme="auto"\n  data-accent="#267265"\n  data-border\n  defer></script>`}
+          text={`<div id="ascs-comments"></div>\n<script src="${origin}/embed.js"\n  data-site="${detail.site.id}"\n  data-target="ascs-comments"\n  data-theme="auto"\n  data-accent="#267265"\n  data-border\n  data-background="#f6f7f8"\n  data-background-opacity="0.85"\n  defer></script>`}
         />
       </section>
       <section className="settings-section">

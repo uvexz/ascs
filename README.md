@@ -69,7 +69,7 @@ bun run dev
 ></script>
 ```
 
-可选属性：`data-url` 覆盖文章 URL，`data-page` 使用不会随 URL 改名的稳定文章 ID，`data-accent` 使用 6 位十六进制品牌色，`data-border` 为评论区添加边框和圆角（设为 `false` 关闭）。脚本本身约 2 KB，评论 UI 运行在 sandbox iframe 中，博客 CSS 不会污染评论区。登录时会在服务域名打开顶层弹窗完成认证，成功后自动回到文章页；博客页面无法读取该凭据。首次嵌入前，在后台复制验证 TXT 记录到 `_ascs.<域名>`，再点击“检查验证”。
+可选属性：`data-url` 覆盖文章 URL，`data-page` 使用不会随 URL 改名的稳定文章 ID，`data-accent` 使用 6 位十六进制品牌色，`data-border` 为评论区添加边框和圆角（设为 `false` 关闭），`data-background` 设置背景色（`#rgb` / `#rrggbb`，或带透明通道的 `#rgba` / `#rrggbbaa`）或 http/https 背景图片，`data-background-opacity`（0 到 1）统一调整背景透明度。脚本本身约 2 KB，评论 UI 运行在 sandbox iframe 中，博客 CSS 不会污染评论区。登录时会在服务域名打开顶层弹窗完成认证，成功后自动回到文章页；博客页面无法读取该凭据。首次嵌入前，在后台复制验证 TXT 记录到 `_ascs.<域名>`，再点击“检查验证”。
 
 文章 URL 必须和站点 origin 完全匹配；服务端会重新规范化 URL、校验站点归属和文章标识，不信任脚本传入的权限或用户 ID。
 

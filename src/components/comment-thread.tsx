@@ -18,6 +18,8 @@ export type WidgetOptions = {
   theme?: 'auto' | 'light' | 'dark'
   accent?: string
   border?: 'true'
+  background?: string
+  backgroundOpacity?: number
 }
 
 export function Thread({

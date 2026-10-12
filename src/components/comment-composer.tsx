@@ -67,6 +67,8 @@ export function CommentComposer({
           theme: undefined,
           accent: undefined,
           border: undefined,
+          background: undefined,
+          backgroundOpacity: undefined,
           parentId: reply?.id,
           body: text,
           author: session.data ? undefined : String(form.get('author')),

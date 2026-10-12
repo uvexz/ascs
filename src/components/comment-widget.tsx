@@ -306,15 +306,47 @@ function Widget({
       setError(errorText(errorValue))
     },
   })
+  // Optional presentational options, composed once so every render branch
+  // (loading, error, ready) shows the same skin.
+  const style = {
+    ...(options.accent && /^#[0-9a-f]{6}$/i.test(options.accent)
+      ? {
+          '--accent': options.accent,
+          '--color-kumo-brand': options.accent,
+          '--color-kumo-brand-hover': `color-mix(in srgb, ${options.accent}, black 15%)`,
+        }
+      : {}),
+    ...(options.background
+      ? options.background.startsWith('#')
+        ? { '--widget-bg-color': options.background }
+        : { '--widget-bg-image': `url("${options.background}")` }
+      : {}),
+    ...(options.backgroundOpacity !== undefined
+      ? { '--widget-bg-opacity': String(options.backgroundOpacity) }
+      : {}),
+  } as React.CSSProperties
+  const widgetStyle = Object.keys(style).length > 0 ? style : undefined
+  const background = options.background ? 'true' : undefined
   if (config.isPending)
     return (
-      <main className="widget" data-border={options.border} role="status">
+      <main
+        className="widget"
+        data-border={options.border}
+        data-background={background}
+        style={widgetStyle}
+        role="status"
+      >
         正在加载评论…
       </main>
     )
   if (config.error)
     return (
-      <main className="widget" data-border={options.border}>
+      <main
+        className="widget"
+        data-border={options.border}
+        data-background={background}
+        style={widgetStyle}
+      >
         <QueryError error={config.error} retry={config.refetch} />
       </main>
     )
@@ -324,15 +356,8 @@ function Widget({
       className="widget"
       data-mode={mode}
       data-border={options.border}
-      style={
-        options.accent && /^#[0-9a-f]{6}$/i.test(options.accent)
-          ? ({
-              '--accent': options.accent,
-              '--color-kumo-brand': options.accent,
-              '--color-kumo-brand-hover': `color-mix(in srgb, ${options.accent}, black 15%)`,
-            } as React.CSSProperties)
-          : undefined
-      }
+      data-background={background}
+      style={widgetStyle}
     >
       <header className="widget-heading">
         <h1>

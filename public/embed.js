@@ -18,6 +18,12 @@
     url.searchParams.set('accent', script.dataset.accent)
   if ('border' in script.dataset && script.dataset.border !== 'false')
     url.searchParams.set('border', 'true')
+  // Background values are re-validated by the widget route, which drops anything
+  // it cannot parse, so forwarding them verbatim cannot break the frame.
+  if (script.dataset.background)
+    url.searchParams.set('background', script.dataset.background)
+  if (script.dataset.backgroundOpacity)
+    url.searchParams.set('backgroundOpacity', script.dataset.backgroundOpacity)
   var status = document.createElement('p')
   status.textContent = '正在加载评论…'
   status.setAttribute('role', 'status')

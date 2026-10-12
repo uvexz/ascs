@@ -738,6 +738,26 @@ input[type='checkbox'] {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+/* The custom background sits on its own layer above the widget's own background
+   but below the content, so `opacity` can fade a color or image uniformly. */
+.widget[data-background] {
+  position: relative;
+  isolation: isolate;
+}
+.widget[data-background]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: var(--widget-bg-color, transparent);
+  background-image: var(--widget-bg-image, none);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  opacity: var(--widget-bg-opacity, 1);
+}
 .widget-heading {
   display: flex;
   justify-content: space-between;
