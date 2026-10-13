@@ -36,6 +36,7 @@ import {
 } from '../lib/system-settings'
 import { id, PAGE_SIZE } from '../lib/validation'
 import { body, json, params } from './http.server'
+import { invalidateSite } from './site-cache.server'
 import { auth } from '../lib/auth'
 import {
   check,
@@ -565,6 +566,7 @@ export async function handleAdmin(request: Request, path: string[]) {
           audit(actor, input.enabled ? 'site.enable' : 'site.disable', target),
         )
     })
+    invalidateSite(target)
     return json({ ok: true })
   }
   if (resource === 'mail' && request.method === 'POST') {

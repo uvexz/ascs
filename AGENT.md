@@ -22,45 +22,48 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 
 ## 模块地图
 
-| 路径                                  | 职责                                                                        |
-| ------------------------------------- | --------------------------------------------------------------------------- |
-| `src/db/schema.ts`                    | Better Auth 表、站点、成员、评论、点赞、封禁、限流、邮件队列                |
-| `src/db/index.ts`                     | libSQL client 和 Drizzle 实例，仅服务端使用                                 |
-| `src/lib/auth.ts`                     | Better Auth 服务端配置和数据库适配                                          |
-| `src/lib/auth-client.ts`              | 浏览器认证客户端                                                            |
-| `src/lib/validation.ts`               | Zod 输入校验、共享枚举和分页常量                                            |
-| `src/lib/api.ts`                      | 浏览器 fetch、错误类型、查询参数编码                                        |
-| `src/lib/widget-session.ts`           | 跨站 iframe 的短期会话令牌存储与查询                                        |
-| `src/lib/cache.ts`                    | TanStack Query 缓存失效 helper                                              |
-| `src/lib/system-settings.ts`          | 系统设置的类型、默认值和 Zod schema                                         |
-| `src/server/security.server.ts`       | session、站点授权、来源检查、HMAC、原子限流、challenge                      |
-| `src/server/captcha.server.ts`        | 可选 Cap 人机验证（`CAP_SITE`/`CAP_KEY`），供注册、登录、重置密码和评论使用 |
-| `src/components/captcha.tsx`          | `cap-widget` 包装，上报一次性 token                                         |
-| `src/server/http.server.ts`           | 请求体读取、查询参数解析和 JSON 响应 helper                                 |
-| `src/server/api.server.ts`            | `/api/v1/*` 分发及评论、站点管理业务                                        |
-| `src/server/profile.server.ts`        | 个人资料、账户绑定和邮箱变更服务                                            |
-| `src/server/mail.server.ts`           | 持久化邮件 outbox 和 SMTP worker                                            |
-| `src/start.ts`                        | 请求中间件和安全响应头                                                      |
-| `src/router.tsx`                      | 每个 router 独立的 QueryClient                                              |
-| `src/routes/`                         | 页面和 API 文件路由                                                         |
-| `src/routes/admin/`                   | 后台子路由：站点视图 `/admin/site/$siteId/*`、实例视图 `/admin/instance/*`  |
-| `src/components/admin-shell.tsx`      | 后台外壳：侧栏导航、顶栏、创建站点和未保存设置拦截                          |
-| `src/components/admin/`               | 站点后台子模块（评审、统计、集成、设置、成员、站点选择）                    |
-| `src/components/instance/`            | 实例后台子模块（用户、站点、邮件、审计、系统设置）                          |
-| `src/lib/queries.ts`                  | 共享 queryOptions（dashboard / siteDetail / profile）                       |
-| `src/server/admin.server.ts`          | 实例管理员接口、用户/站点/邮件运维与审计                                    |
-| `src/server/settings.server.ts`       | 加密系统设置、脱敏读取和注册策略                                            |
-| `src/components/comment-widget.tsx`   | 评论组件外壳：嵌入检测、会话分支、列表、分页与排序                          |
-| `src/components/comment-composer.tsx` | 评论表单、匿名字段、预览与蜜罐                                              |
-| `src/components/comment-thread.tsx`   | 单条评论、嵌套回复、点赞和展开                                              |
-| `src/components/markdown.tsx`         | 统一安全 Markdown 渲染                                                      |
-| `src/components/`                     | 认证、个人资料和公共 UI 组件                                                |
-| `src/styles.css`                      | Tailwind/Kumo 导入、应用样式和响应式布局                                    |
-| `public/embed.js`                     | 无依赖 iframe 嵌入脚本和高度消息校验                                        |
-| `scripts/`                            | 环境初始化、数据库迁移、管理员初始化、邮件发送                              |
-| `drizzle/`                            | 已提交的迁移 SQL 和元数据                                                   |
-| `Dockerfile`、`compose.yaml`          | 自托管容器、数据 volume 和健康检查                                          |
-| `vercel.json`                         | Vercel 构建命令和邮件 cron                                                  |
+| 路径                                       | 职责                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| `src/db/schema.ts`                         | Better Auth 表、站点、成员、评论、点赞、封禁、限流、邮件队列                |
+| `src/db/index.ts`                          | libSQL client 和 Drizzle 实例，仅服务端使用                                 |
+| `src/lib/auth.ts`                          | Better Auth 服务端配置和数据库适配                                          |
+| `src/lib/auth-client.ts`                   | 浏览器认证客户端                                                            |
+| `src/lib/validation.ts`                    | Zod 输入校验、共享枚举和分页常量                                            |
+| `src/lib/api.ts`                           | 浏览器 fetch、错误类型、查询参数编码                                        |
+| `src/lib/widget-session.ts`                | 跨站 iframe 的短期会话令牌存储与查询                                        |
+| `src/lib/widget-queries.ts`                | widget 配置/评论的 queryOptions 与服务端函数（SSR 预取，复用 `handleApi`）  |
+| `src/lib/cache.ts`                         | TanStack Query 缓存失效 helper                                              |
+| `src/lib/system-settings.ts`               | 系统设置的类型、默认值和 Zod schema                                         |
+| `src/server/security.server.ts`            | session、站点授权、来源检查、HMAC、原子限流、challenge                      |
+| `src/server/site-cache.server.ts`          | 站点记录的短 TTL 进程内缓存（CSP 中间件与公开接口复用，写操作显式失效）     |
+| `src/server/captcha.server.ts`             | 可选 Cap 人机验证（`CAP_SITE`/`CAP_KEY`），供注册、登录、重置密码和评论使用 |
+| `src/components/captcha.tsx`               | `cap-widget` 包装，上报一次性 token                                         |
+| `src/server/http.server.ts`                | 请求体读取、查询参数解析和 JSON 响应 helper                                 |
+| `src/server/api.server.ts`                 | `/api/v1/*` 分发及评论、站点管理业务                                        |
+| `src/server/profile.server.ts`             | 个人资料、账户绑定和邮箱变更服务                                            |
+| `src/server/mail.server.ts`                | 持久化邮件 outbox 和 SMTP worker                                            |
+| `src/start.ts`                             | 请求中间件和安全响应头                                                      |
+| `src/router.tsx`                           | 每个 router 独立的 QueryClient                                              |
+| `src/routes/`                              | 页面和 API 文件路由                                                         |
+| `src/routes/admin/`                        | 后台子路由：站点视图 `/admin/site/$siteId/*`、实例视图 `/admin/instance/*`  |
+| `src/components/admin-shell.tsx`           | 后台外壳：侧栏导航、顶栏、创建站点和未保存设置拦截                          |
+| `src/components/admin/`                    | 站点后台子模块（评审、统计、集成、设置、成员、站点选择）                    |
+| `src/components/instance/`                 | 实例后台子模块（用户、站点、邮件、审计、系统设置）                          |
+| `src/lib/queries.ts`                       | 共享 queryOptions（dashboard / siteDetail / profile）                       |
+| `src/server/admin.server.ts`               | 实例管理员接口、用户/站点/邮件运维与审计                                    |
+| `src/server/settings.server.ts`            | 加密系统设置、脱敏读取和注册策略                                            |
+| `src/components/comment-widget.tsx`        | 评论组件外壳：按 `embed` 参数分支、会话切换、列表、分页与排序               |
+| `src/components/inline-comment-widget.tsx` | 顶层（非 iframe）widget，按需加载 cookie 登录 UI                            |
+| `src/components/comment-composer.tsx`      | 评论表单、匿名字段、预览与蜜罐                                              |
+| `src/components/comment-thread.tsx`        | 单条评论、嵌套回复、点赞和展开                                              |
+| `src/components/markdown.tsx`              | 统一安全 Markdown 渲染                                                      |
+| `src/components/`                          | 认证、个人资料和公共 UI 组件                                                |
+| `src/styles.css`                           | Tailwind/Kumo 导入、应用样式和响应式布局                                    |
+| `public/embed.js`                          | 无依赖 iframe 嵌入脚本和高度消息校验                                        |
+| `scripts/`                                 | 环境初始化、数据库迁移、管理员初始化、邮件发送                              |
+| `drizzle/`                                 | 已提交的迁移 SQL 和元数据                                                   |
+| `Dockerfile`、`compose.yaml`               | 自托管容器、数据 volume 和健康检查                                          |
+| `vercel.json`                              | Vercel 构建命令和邮件 cron                                                  |
 
 `src/routeTree.gen.ts` 由路由生成器维护，不要手动修改。不要编辑 `.output`、`.tanstack`、`.nitro`、`.vercel`、`node_modules` 或生成的报告来修复源代码问题。
 
@@ -143,6 +146,8 @@ bun run start
 - 业务数据库、认证配置和环境密钥只用于服务端。客户端引用服务端推导类型时使用 `import type`。
 - Query key 包含站点、文章、父评论、排序和分页等依赖，避免跨站缓存污染；mutation 成功后失效相关缓存。
 - QueryClient 不可在 SSR 请求间共享全局实例。
+- widget 路由启用 SSR 与 loader 预取：`embed` 参数决定服务端渲染内嵌还是顶层外壳，服务端与首次客户端渲染必须一致以避免水合不一致；cookie 登录 UI（better-auth 客户端）仅顶层按需加载。
+- SSR 渲染不得依赖浏览器状态：主题在挂载后由 effect 应用，时间统一用 `LocalTime`，localStorage 令牌在挂载后读取。
 - 尽量使用 Kumo Input、Button、Dialog 等组件；图标使用项目现有 Phosphor 图标库。
 - Dialog 保持挂载，以 `open` 控制状态；图标按钮必须提供可访问名称和 tooltip/title。
 - 正文及控件通常为 14px，标题使用适度大小和 `font-semibold`。不要随意改变字距。
@@ -156,6 +161,7 @@ bun run start
 - 本地数据库默认 `file:./data/ascs.db`，Turso 使用 `libsql://...` 和 `DATABASE_AUTH_TOKEN`。
 - Better Auth 表与业务表一起通过 Drizzle 迁移。schema 修改后使用 `bun run db:generate`，检查 SQL，再提交 SQL 和元数据。
 - `bun run db:migrate` 使用 libSQL migrator；生产不要使用 `db:push` 替代受控迁移。
+- 构建期通过 Nitro `compressPublicAssets` 生成预压缩产物，供无反向代理的 Docker/Node 部署直接下发 brotli/gzip；`/embed.js` 的缓存头在 `vite.config.ts` 的 routeRules 中设置。
 - 升级前备份数据库。不要删除旧迁移、直接改写已应用的迁移或重置生产数据库。
 - 本地 SQLite 适合单机持久化部署；Vercel 应使用 Turso 等远程持久化数据库，不能依赖临时文件系统。
 - Docker 使用非 root 用户和持久化 volume。迁移在容器启动时执行；管理员必须初始化在容器实际使用的数据库中，不能把宿主机的另一个数据库当作已初始化 volume。

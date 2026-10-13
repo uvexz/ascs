@@ -69,7 +69,7 @@ export async function api<T>(
 }
 
 export function queryString(
-  values: Record<string, string | number | undefined>,
+  values: Record<string, string | number | boolean | undefined>,
 ) {
   return new URLSearchParams(
     Object.entries(values)

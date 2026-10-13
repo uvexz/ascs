@@ -1,7 +1,5 @@
 import { createMiddleware, createStart } from '@tanstack/react-start'
-import { eq } from 'drizzle-orm'
-import { db } from './db'
-import { sites } from './db/schema'
+import { siteById } from './server/site-cache.server'
 
 const securityHeaders = createMiddleware().server(async ({ request, next }) => {
   const url = new URL(request.url)
@@ -9,12 +7,7 @@ const securityHeaders = createMiddleware().server(async ({ request, next }) => {
   if (url.pathname === '/widget') {
     const siteId = url.searchParams.get('siteId')
     if (siteId && /^[a-f0-9-]{36}$/.test(siteId)) {
-      const site = await db
-        .select({ origin: sites.origin, verifiedAt: sites.verifiedAt })
-        .from(sites)
-        .where(eq(sites.id, siteId))
-        .limit(1)
-        .then((rows) => rows.at(0))
+      const site = await siteById(siteId)
       if (site?.verifiedAt) ancestors = `${site.origin} 'self'`
     }
   }

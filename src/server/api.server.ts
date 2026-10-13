@@ -47,6 +47,7 @@ import {
 } from './security.server'
 import { captchaEndpoint, captchaFailure } from './captcha.server'
 import { flushMail } from './mail.server'
+import { invalidateSite, siteById } from './site-cache.server'
 import { handleAdmin } from './admin.server'
 import { publicSettings } from './settings.server'
 import { body, params, json } from './http.server'
@@ -59,12 +60,7 @@ import {
 } from './profile.server'
 
 async function publicContext(input: z.infer<typeof pageInput>) {
-  const site = await db
-    .select()
-    .from(sites)
-    .where(eq(sites.id, input.siteId))
-    .limit(1)
-    .then((rows) => rows.at(0))
+  const site = await siteById(input.siteId)
   check(site?.verifiedAt && site.enabled, 404, '站点未验证、已停用或不存在')
   const url = new URL(input.pageUrl)
   check(
@@ -656,6 +652,7 @@ async function manageSite(request: Request, siteId: string, action?: string) {
       .update(sites)
       .set(siteSettings.parse(await body(request)))
       .where(eq(sites.id, siteId))
+    invalidateSite(siteId)
     return json({ ok: true })
   }
   if (action === 'verify' && request.method === 'POST') {
@@ -684,6 +681,7 @@ async function manageSite(request: Request, siteId: string, action?: string) {
       .update(sites)
       .set({ verifiedAt: Date.now() })
       .where(eq(sites.id, siteId))
+    invalidateSite(siteId)
     return json({ ok: true })
   }
   if (action === 'comments' && request.method === 'GET')

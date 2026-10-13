@@ -11,6 +11,11 @@
   var url = new URL('/widget', base)
   url.searchParams.set('siteId', script.dataset.site)
   url.searchParams.set('pageUrl', page.href)
+  // Tells the widget route it is framed, so the server can render the embedded
+  // layout (and the first page of comments) without sniffing window.parent. The
+  // value must match what the route serializes (`true`), or the router would
+  // normalize the URL and add a redirect round trip.
+  url.searchParams.set('embed', 'true')
   if (script.dataset.page) url.searchParams.set('pageKey', script.dataset.page)
   if (/^(auto|light|dark)$/.test(script.dataset.theme || ''))
     url.searchParams.set('theme', script.dataset.theme)

@@ -1,8 +1,18 @@
-import { Component } from 'react'
+import { Component, useEffect, useState } from 'react'
 import { Button, Dialog } from '@cloudflare/kumo'
 import { XIcon } from '@phosphor-icons/react'
 import { ApiError, errorText } from '../lib/api'
 import type { ErrorInfo, ReactNode } from 'react'
+
+/**
+ * Renders its children only after mount. Used to keep client-only subtrees out
+ * of the server HTML so hydration cannot mismatch on browser-only state.
+ */
+export function ClientOnly({ children }: { children: ReactNode }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted ? children : null
+}
 
 export class ErrorBoundary extends Component<
   { children: ReactNode },

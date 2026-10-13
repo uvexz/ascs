@@ -6,6 +6,7 @@ import { api, errorText, queryString } from '../lib/api'
 import { queryKeys } from '../lib/query-keys'
 import { profileUrl } from '../lib/validation'
 import { Avatar } from './avatar'
+import { LocalTime } from './local-time'
 import { Markdown } from './markdown'
 import { Pagination } from './pagination'
 import { QueryError } from './ui'
@@ -15,6 +16,7 @@ export type WidgetOptions = {
   siteId: string
   pageUrl: string
   pageKey?: string
+  embed?: boolean
   theme?: 'auto' | 'light' | 'dark'
   accent?: string
   border?: 'true'
@@ -108,9 +110,7 @@ export function Thread({
             ) : (
               <strong className="break-words">{comment.author}</strong>
             )}
-            <time>
-              {new Date(comment.createdAt).toLocaleDateString('zh-CN')}
-            </time>
+            <LocalTime value={comment.createdAt} format="date" />
           </div>
           {comment.status === 'deleted' ? (
             <p className="text-muted py-2">评论已删除</p>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, LinkButton } from '@cloudflare/kumo'
 import {
@@ -8,31 +8,30 @@ import {
   SignOutIcon,
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../lib/api'
-import { authClient } from '../lib/auth-client'
 import { resetAuthCaches } from '../lib/cache'
-import { queryKeys, staleTimes } from '../lib/query-keys'
+import { queryKeys } from '../lib/query-keys'
 import {
   clearWidgetToken,
   getWidgetToken,
   setWidgetToken,
   useWidgetSession,
 } from '../lib/widget-session'
-import { AuthForm } from './auth-form'
+import { widgetCommentsQuery, widgetConfigQuery } from '../lib/widget-queries'
 import { Avatar } from './avatar'
 import { CommentComposer } from './comment-composer'
 import { Thread } from './comment-thread'
-import { AppDialog, QueryError, focusContent } from './ui'
+import { ClientOnly, QueryError, focusContent } from './ui'
 import { Pagination } from './pagination'
 import type { WidgetOptions } from './comment-thread'
-import type { CommentList, CommentLocation } from '../server/api.server'
+import type { CommentLocation } from '../server/api.server'
 
-type Config = {
-  name: string
-  allowAnonymous: boolean
-  theme: 'auto' | 'light' | 'dark'
-  challenge: string
-  captcha: string | null
-}
+// The cookie-based login UI (and the whole better-auth client) is only reachable
+// from the top-level page, never inside the iframe, so it loads on demand.
+const InlineCommentWidget = lazy(() =>
+  import('./inline-comment-widget').then((module) => ({
+    default: module.InlineCommentWidget,
+  })),
+)
 
 type WidgetSession = {
   data: { user: { id: string; name: string; image?: string | null } } | null
@@ -44,57 +43,46 @@ type WidgetSession = {
  * mounts on a top-level page. Inside a cross-origin iframe the cookie session is
  * unreachable, so that branch talks to the short-lived widget bearer session
  * instead and never issues the cookie request.
+ *
+ * The initial branch comes from the `embed` param embed.js sets, which both the
+ * server and the client can read, so the server HTML and the first client render
+ * always agree. `window.parent` still decides afterwards for embeds that predate
+ * the param.
  */
 export function CommentWidget({ options }: { options: WidgetOptions }) {
-  const embedded = typeof window !== 'undefined' && window.parent !== window
-  return embedded ? (
-    <EmbeddedCommentWidget options={options} />
-  ) : (
-    <InlineCommentWidget options={options} />
-  )
-}
-
-function InlineCommentWidget({ options }: { options: WidgetOptions }) {
-  const queryClient = useQueryClient()
-  const [authOpen, setAuthOpen] = useState(false)
-  const session = authClient.useSession()
+  const [embedded, setEmbedded] = useState(options.embed === true)
   useEffect(() => {
-    if (session.data) setAuthOpen(false)
-  }, [session.data])
+    setEmbedded(window.parent !== window)
+  }, [])
+  if (embedded) return <EmbeddedCommentWidget options={options} />
   return (
-    <>
-      <Widget
-        options={options}
-        session={session}
-        onLogin={() => setAuthOpen(true)}
-        onSignOut={async () => {
-          const result = await authClient.signOut()
-          if (result.error) return result.error.message || '退出失败'
-          resetAuthCaches(queryClient)
-          return null
-        }}
-      />
-      <AppDialog
-        open={authOpen}
-        onOpenChange={setAuthOpen}
-        title="登录 ASCS"
-        description="登录后可以使用账号发表评论、回复和点赞。"
-      >
-        <AuthForm compact />
-      </AppDialog>
-    </>
+    <ClientOnly>
+      <Suspense fallback={null}>
+        <InlineCommentWidget options={options} />
+      </Suspense>
+    </ClientOnly>
   )
 }
 
 function EmbeddedCommentWidget({ options }: { options: WidgetOptions }) {
   const queryClient = useQueryClient()
-  const [token, setToken] = useState<string | null>(() =>
-    typeof window === 'undefined' ? null : getWidgetToken(),
-  )
+  // Read the stored token after mount only: the server cannot see localStorage,
+  // so a synchronous read here would render a different header than the SSR HTML.
+  const [token, setToken] = useState<string | null>(null)
+  useEffect(() => setToken(getWidgetToken()), [])
   const [loginError, setLoginError] = useState('')
   const popupRef = useRef<Window | null>(null)
   const nonceRef = useRef('')
   const widgetSession = useWidgetSession(token)
+  // The preloaded comment list is anonymous, so a returning signed-in visitor
+  // refetches it once with their bearer token to restore per-voter state (their
+  // own likes). Anonymous visitors keep the preloaded list untouched.
+  useEffect(() => {
+    if (!token) return
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.scope.comments(options.siteId),
+    })
+  }, [token, queryClient, options.siteId])
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (
@@ -160,7 +148,7 @@ function EmbeddedCommentWidget({ options }: { options: WidgetOptions }) {
   )
 }
 
-function Widget({
+export function Widget({
   options,
   session,
   onLogin,
@@ -174,18 +162,7 @@ function Widget({
   loginError?: string
 }) {
   const queryClient = useQueryClient()
-  const config = useQuery({
-    queryKey: queryKeys.widgetConfig(
-      options.siteId,
-      options.pageUrl,
-      options.pageKey,
-      options.theme,
-      options.accent,
-    ),
-    queryFn: ({ signal }) =>
-      api<Config>(`config?${queryString(options)}`, { signal }),
-    staleTime: staleTimes.static,
-  })
+  const config = useQuery(widgetConfigQuery(options))
   const [reply, setReply] = useState<{ id: string; author: string } | null>(
     null,
   )
@@ -196,13 +173,11 @@ function Widget({
   const [sort, setSort] = useState<'newest' | 'oldest' | 'popular'>('newest')
   const [page, setPage] = useState(1)
   const [expandPath, setExpandPath] = useState<string[]>([])
+  // The initial mode only follows the explicit theme so server HTML and the
+  // first client render agree; `prefers-color-scheme` is applied after mount by
+  // the effect below.
   const [mode, setMode] = useState<'light' | 'dark'>(() =>
-    options.theme === 'dark' ||
-    (!options.theme &&
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches)
-      ? 'dark'
-      : 'light',
+    options.theme === 'dark' ? 'dark' : 'light',
   )
   const textRef = useRef(text)
   const replyRef = useRef(reply)
@@ -247,20 +222,17 @@ function Widget({
     notify()
     return () => observer.disconnect()
   }, [options.siteId, options.pageUrl])
-  const list = useQuery({
-    queryKey: queryKeys.commentList({
+  // No longer gated on `config`: the list and config are independent, so firing
+  // both at once removes a full round trip from the first paint.
+  const list = useQuery(
+    widgetCommentsQuery({
       siteId: options.siteId,
       pageUrl: options.pageUrl,
       pageKey: options.pageKey,
       sort,
       page,
     }),
-    queryFn: ({ signal }) =>
-      api<CommentList>(`comments?${queryString({ ...options, sort, page })}`, {
-        signal,
-      }),
-    enabled: !!config.data,
-  })
+  )
   const send = useMutation({
     mutationFn: (input: Record<string, unknown>) =>
       api<{ id: string; status: string }>('comments', {
@@ -327,18 +299,6 @@ function Widget({
   } as React.CSSProperties
   const widgetStyle = Object.keys(style).length > 0 ? style : undefined
   const background = options.background ? 'true' : undefined
-  if (config.isPending)
-    return (
-      <main
-        className="widget"
-        data-border={options.border}
-        data-background={background}
-        style={widgetStyle}
-        role="status"
-      >
-        正在加载评论…
-      </main>
-    )
   if (config.error)
     return (
       <main
@@ -410,7 +370,11 @@ function Widget({
           </Button>
         )}
       </header>
-      {!config.data.allowAnonymous && !session.data ? (
+      {!config.data ? (
+        <p role="status" className="py-6 text-muted">
+          正在加载评论…
+        </p>
+      ) : !config.data.allowAnonymous && !session.data ? (
         <div className="empty-state">
           <ChatCircleIcon size={30} aria-hidden="true" />
           <div className="empty-copy">

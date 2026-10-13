@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { CommentWidget } from '../components/comment-widget'
 import { ErrorBoundary } from '../components/ui'
 import { id, themeSchema } from '../lib/validation'
+import { widgetCommentsQuery, widgetConfigQuery } from '../lib/widget-queries'
 
 const hexColor = /^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i
 
@@ -30,6 +31,12 @@ const search = z.object({
     .union([z.string(), z.number()])
     .transform((value) => String(value))
     .pipe(z.string().min(1).max(300))
+    .optional(),
+  // Set by embed.js. It lets the server render the framed layout (and preload
+  // comments) without sniffing `window.parent`, which the server cannot do.
+  embed: z
+    .union([z.boolean(), z.number(), z.string()])
+    .transform((value) => value === true || value === 1 || value === '1')
     .optional(),
   theme: themeSchema.optional(),
   accent: z
@@ -62,8 +69,20 @@ const search = z.object({
     .catch(undefined),
 })
 export const Route = createFileRoute('/widget')({
-  ssr: false,
   validateSearch: (input: Record<string, unknown>) => search.parse(input),
+  loaderDeps: ({ search: query }) => query,
+  // Preload config and the first page of comments so both ship in the HTML the
+  // iframe receives and the client hydrates without a cold fetch. `allSettled`
+  // keeps a bad site from failing the route: the widget renders its own error
+  // state from the cached failure instead.
+  loader: async ({ deps, context }) => {
+    await Promise.allSettled([
+      context.queryClient.fetchQuery(widgetConfigQuery(deps)),
+      context.queryClient.fetchQuery(
+        widgetCommentsQuery({ ...deps, sort: 'newest', page: 1 }),
+      ),
+    ])
+  },
   head: () => ({
     meta: [{ title: 'ASCS · 评论' }, { name: 'robots', content: 'noindex' }],
   }),
