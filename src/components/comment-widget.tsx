@@ -213,7 +213,11 @@ export function Widget({
         {
           type: 'ascs:resize',
           siteId: options.siteId,
-          height: document.documentElement.scrollHeight,
+          // `body`, not `documentElement`: the root element's scrollHeight is
+          // floored at the viewport (the current iframe height), so reporting it
+          // would pin the frame to its tallest value and leave blank space below
+          // the comments whenever the content shrinks.
+          height: document.body.scrollHeight,
         },
         origin,
       )
