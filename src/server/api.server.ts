@@ -46,6 +46,8 @@ import {
   voterIdentity,
 } from './security.server'
 import { captchaEndpoint, captchaFailure, captchaWasm } from './captcha.server'
+import { moderateComment } from './moderation.server'
+import { extractLinks } from '../lib/moderation'
 import { flushMail } from './mail.server'
 import { invalidateSite, siteById } from './site-cache.server'
 import { handleAdmin } from './admin.server'
@@ -80,6 +82,35 @@ const counts = (siteId: string) =>
     .from(comments)
     .where(eq(comments.siteId, siteId))
     .groupBy(comments.status)
+
+// Bounded author history for AI moderation (one aggregate query, no PII): how
+// many comments this identity has left on the site and how many in the last
+// week. Deleted comments are excluded so cleaned-up history is not counted.
+async function commentHistory(
+  siteId: string,
+  userId: string | null,
+  emailHash: string,
+) {
+  const recentSince = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*)`,
+      recent: sql<
+        number | null
+      >`sum(case when ${comments.createdAt} > ${recentSince} then 1 else 0 end)`,
+    })
+    .from(comments)
+    .where(
+      and(
+        eq(comments.siteId, siteId),
+        userId
+          ? eq(comments.userId, userId)
+          : eq(comments.emailHash, emailHash),
+        ne(comments.status, 'deleted'),
+      ),
+    )
+  return { total: row.total, recent: row.recent ?? 0 }
+}
 
 async function listComments(request: Request) {
   const input = listInput.parse(params(request))
@@ -245,6 +276,7 @@ async function createComment(request: Request) {
   const emailHash = digest(
     `email:${(session?.user.email || input.email!).toLowerCase()}`,
   )
+  const author = session?.user.name || input.author!
   const identities = [
     and(eq(bans.kind, 'email'), eq(bans.value, emailHash)),
     and(eq(bans.kind, 'ip'), eq(bans.value, ip)),
@@ -259,6 +291,7 @@ async function createComment(request: Request) {
     .limit(1)
   check(!banned.length, 403, '你已被此站点封禁')
   let depth = 0
+  let parentContext: { author: string; body: string } | null = null
   if (input.parentId) {
     const [parent] = await db
       .select()
@@ -275,6 +308,7 @@ async function createComment(request: Request) {
     check(parent, 400, '只能回复同站点、同文章的已发布评论')
     depth = parent.depth + 1
     check(depth <= 4, 400, '回复层级已达上限')
+    parentContext = { author: parent.author, body: parent.body }
   }
   const duplicate = await db
     .select({ id: comments.id })
@@ -294,20 +328,55 @@ async function createComment(request: Request) {
     .split(/\r?\n/)
     .map((v) => v.trim().toLowerCase())
     .filter(Boolean)
-  const spamReason = words.some((word) =>
+  const localSpamReason = words.some((word) =>
     input.body.toLowerCase().includes(word),
   )
     ? 'blocked-word'
     : (input.body.match(/https?:\/\//gi)?.length || 0) > 3
       ? 'too-many-links'
       : null
-  const status = spamReason
-    ? 'spam'
-    : site.moderation === 'all' || (site.moderation === 'anonymous' && !session)
+  const baselineStatus: 'pending' | 'approved' =
+    site.moderation === 'all' || (site.moderation === 'anonymous' && !session)
       ? 'pending'
       : 'approved'
+  let spamReason = localSpamReason
+  let status: 'pending' | 'approved' | 'spam' = localSpamReason
+    ? 'spam'
+    : baselineStatus
+  // Local rules win and are never softened. AI moderation runs only on comments
+  // that passed them and can only tighten the outcome: an auto-approval still
+  // yields the site's own baseline (its "review all" policy is never bypassed),
+  // while a quarantine/review/unavailable result overrides it.
+  if (!localSpamReason) {
+    const history = await commentHistory(
+      site.id,
+      session?.user.id ?? null,
+      emailHash,
+    )
+    const moderation = await moderateComment({
+      pageUrl,
+      pageKey,
+      pageTitle: input.pageTitle ?? null,
+      pageDescription: input.pageDescription ?? null,
+      body: input.body,
+      authorName: author,
+      registered: !!session,
+      authorWebsite: session?.user.website ?? null,
+      authorComments: history.total,
+      authorRecentComments: history.recent,
+      parentAuthor: parentContext?.author ?? null,
+      parentBody: parentContext?.body ?? null,
+      links: extractLinks(input.body),
+    })
+    if (moderation.enabled) {
+      spamReason = moderation.mapped.reason
+      status =
+        moderation.mapped.status === 'approved'
+          ? baselineStatus
+          : moderation.mapped.status
+    }
+  }
   const commentId = randomUUID()
-  const author = session?.user.name || input.author!
   // Comment and its notification are committed atomically.
   await db.transaction(async (tx) => {
     await tx.insert(comments).values({

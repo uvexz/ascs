@@ -17,6 +17,11 @@
   // normalize the URL and add a redirect round trip.
   url.searchParams.set('embed', 'true')
   if (script.dataset.page) url.searchParams.set('pageKey', script.dataset.page)
+  // Optional article context, used only to help AI moderation judge relevance.
+  if (script.dataset.title)
+    url.searchParams.set('pageTitle', script.dataset.title)
+  if (script.dataset.description)
+    url.searchParams.set('pageDescription', script.dataset.description)
   if (/^(auto|light|dark)$/.test(script.dataset.theme || ''))
     url.searchParams.set('theme', script.dataset.theme)
   if (/^#[0-9a-f]{6}$/i.test(script.dataset.accent || ''))

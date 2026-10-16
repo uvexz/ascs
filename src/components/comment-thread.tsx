@@ -16,6 +16,9 @@ export type WidgetOptions = {
   siteId: string
   pageUrl: string
   pageKey?: string
+  // Optional article context forwarded to AI moderation; never trusted for auth.
+  pageTitle?: string
+  pageDescription?: string
   embed?: boolean
   theme?: 'auto' | 'light' | 'dark'
   accent?: string

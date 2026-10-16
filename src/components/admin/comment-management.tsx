@@ -12,6 +12,7 @@ import { api, errorText, queryString } from '../../lib/api'
 import { invalidateSiteCaches } from '../../lib/cache'
 import { queryKeys } from '../../lib/query-keys'
 import { profileUrl } from '../../lib/validation'
+import { spamReasonLabel } from '../../lib/moderation'
 import { Avatar } from '../avatar'
 import { LocalTime } from '../local-time'
 import { QueryError } from '../ui'
@@ -209,10 +210,7 @@ export function CommentManagement({
                 )}
                 {comment.spamReason && (
                   <span className="text-muted">
-                    垃圾检测：
-                    {comment.spamReason === 'blocked-word'
-                      ? '屏蔽词'
-                      : '链接过多'}
+                    垃圾检测：{spamReasonLabel(comment.spamReason)}
                   </span>
                 )}
               </div>

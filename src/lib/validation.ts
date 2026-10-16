@@ -109,6 +109,10 @@ export const commentInput = pageInput.extend({
   body: z.string().trim().min(1).max(5000),
   author: z.string().trim().min(1).max(60).optional(),
   email: z.email().max(254).optional(),
+  // Optional article context that the embed script may forward so AI moderation
+  // can judge relevance. Treated as untrusted data, capped to keep it small.
+  pageTitle: z.string().trim().max(300).optional(),
+  pageDescription: z.string().trim().max(600).optional(),
   // Honeypot: a hidden lure field that legitimate users never fill. Kept
   // separate from any real profile field so bot traffic cannot alias into one.
   honeypot: z.string().max(200).default(''),

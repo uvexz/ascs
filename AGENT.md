@@ -18,52 +18,56 @@ ASCS（A Simple Comment System）是现代、轻量、安全、易部署的多�
 - Nodemailer：SMTP；数据库 outbox 负责持久化、重试和任务租约。
 - Nitro：Node server 和 PaaS 部署适配。
 
-依赖的实际版本应从 lockfile 或安装后的包核实，不要只根据 `package.json` 的版本范围推断 API。仓库同时存在 `package-lock.json` 和 `bun.lock`，两者都要保持同步；Docker 与 Vercel 使用 `npm ci` / `npm run build`（基于 `package-lock.json`），本地开发可用 bun。依赖变更后必须同时更新两个 lockfile。
+使用 bun 作为包管理器：统一用 `bun install`、`bun run <script>`、`bun add` / `bun remove`，不要用 npm、pnpm 或 yarn 安装依赖或执行脚本。
+
+依赖的实际版本应从 lockfile 或安装后的包核实，不要只根据 `package.json` 的版本范围推断 API。仓库同时存在 `package-lock.json` 和 `bun.lock`，两者都要保持同步；Docker 与 Vercel 使用 `npm ci` / `npm run build`（基于 `package-lock.json`），本地开发使用 bun。依赖变更后必须同时更新两个 lockfile。
 
 ## 模块地图
 
-| 路径                                       | 职责                                                                        |
-| ------------------------------------------ | --------------------------------------------------------------------------- |
-| `src/db/schema.ts`                         | Better Auth 表、站点、成员、评论、点赞、封禁、限流、邮件队列                |
-| `src/db/index.ts`                          | libSQL client 和 Drizzle 实例，仅服务端使用                                 |
-| `src/lib/auth.ts`                          | Better Auth 服务端配置和数据库适配                                          |
-| `src/lib/auth-client.ts`                   | 浏览器认证客户端                                                            |
-| `src/lib/validation.ts`                    | Zod 输入校验、共享枚举和分页常量                                            |
-| `src/lib/api.ts`                           | 浏览器 fetch、错误类型、查询参数编码                                        |
-| `src/lib/widget-session.ts`                | 跨站 iframe 的短期会话令牌存储与查询                                        |
-| `src/lib/widget-queries.ts`                | widget 配置/评论的 queryOptions 与服务端函数（SSR 预取，复用 `handleApi`）  |
-| `src/lib/cache.ts`                         | TanStack Query 缓存失效 helper                                              |
-| `src/lib/system-settings.ts`               | 系统设置的类型、默认值和 Zod schema                                         |
-| `src/server/security.server.ts`            | session、站点授权、来源检查、HMAC、原子限流、challenge                      |
-| `src/server/site-cache.server.ts`          | 站点记录的短 TTL 进程内缓存（CSP 中间件与公开接口复用，写操作显式失效）     |
-| `src/server/captcha.server.ts`             | 可选 Cap 人机验证（`CAP_SITE`/`CAP_KEY`），供注册、登录、重置密码和评论使用 |
-| `src/components/captcha.tsx`               | `cap-widget` 包装，上报一次性 token                                         |
-| `src/server/http.server.ts`                | 请求体读取、查询参数解析和 JSON 响应 helper                                 |
-| `src/server/api.server.ts`                 | `/api/v1/*` 分发及评论、站点管理业务                                        |
-| `src/server/profile.server.ts`             | 个人资料、账户绑定和邮箱变更服务                                            |
-| `src/server/mail.server.ts`                | 持久化邮件 outbox 和 SMTP worker                                            |
-| `src/start.ts`                             | 请求中间件和安全响应头                                                      |
-| `src/router.tsx`                           | 每个 router 独立的 QueryClient                                              |
-| `src/routes/`                              | 页面和 API 文件路由                                                         |
-| `src/routes/admin/`                        | 后台子路由：站点视图 `/admin/site/$siteId/*`、实例视图 `/admin/instance/*`  |
-| `src/components/admin-shell.tsx`           | 后台外壳：侧栏导航、顶栏、创建站点和未保存设置拦截                          |
-| `src/components/admin/`                    | 站点后台子模块（评审、统计、集成、设置、成员、站点选择）                    |
-| `src/components/instance/`                 | 实例后台子模块（用户、站点、邮件、审计、系统设置）                          |
-| `src/lib/queries.ts`                       | 共享 queryOptions（dashboard / siteDetail / profile）                       |
-| `src/server/admin.server.ts`               | 实例管理员接口、用户/站点/邮件运维与审计                                    |
-| `src/server/settings.server.ts`            | 加密系统设置、脱敏读取和注册策略                                            |
-| `src/components/comment-widget.tsx`        | 评论组件外壳：按 `embed` 参数分支、会话切换、列表、分页与排序               |
-| `src/components/inline-comment-widget.tsx` | 顶层（非 iframe）widget，按需加载 cookie 登录 UI                            |
-| `src/components/comment-composer.tsx`      | 评论表单、匿名字段、预览与蜜罐                                              |
-| `src/components/comment-thread.tsx`        | 单条评论、嵌套回复、点赞和展开                                              |
-| `src/components/markdown.tsx`              | 统一安全 Markdown 渲染                                                      |
-| `src/components/`                          | 认证、个人资料和公共 UI 组件                                                |
-| `src/styles.css`                           | Tailwind/Kumo 导入、应用样式和响应式布局                                    |
-| `public/embed.js`                          | 无依赖 iframe 嵌入脚本和高度消息校验                                        |
-| `scripts/`                                 | 环境初始化、数据库迁移、管理员初始化、邮件发送                              |
-| `drizzle/`                                 | 已提交的迁移 SQL 和元数据                                                   |
-| `Dockerfile`、`compose.yaml`               | 自托管容器、数据 volume 和健康检查                                          |
-| `vercel.json`                              | Vercel 构建命令和邮件 cron                                                  |
+| 路径                                       | 职责                                                                                                           |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `src/db/schema.ts`                         | Better Auth 表、站点、成员、评论、点赞、封禁、限流、邮件队列                                                   |
+| `src/db/index.ts`                          | libSQL client 和 Drizzle 实例，仅服务端使用                                                                    |
+| `src/lib/auth.ts`                          | Better Auth 服务端配置和数据库适配                                                                             |
+| `src/lib/auth-client.ts`                   | 浏览器认证客户端                                                                                               |
+| `src/lib/validation.ts`                    | Zod 输入校验、共享枚举和分页常量                                                                               |
+| `src/lib/api.ts`                           | 浏览器 fetch、错误类型、查询参数编码                                                                           |
+| `src/lib/widget-session.ts`                | 跨站 iframe 的短期会话令牌存储与查询                                                                           |
+| `src/lib/widget-queries.ts`                | widget 配置/评论的 queryOptions 与服务端函数（SSR 预取，复用 `handleApi`）                                     |
+| `src/lib/cache.ts`                         | TanStack Query 缓存失效 helper                                                                                 |
+| `src/lib/system-settings.ts`               | 系统设置的类型、默认值和 Zod schema                                                                            |
+| `src/server/security.server.ts`            | session、站点授权、来源检查、HMAC、原子限流、challenge                                                         |
+| `src/server/site-cache.server.ts`          | 站点记录的短 TTL 进程内缓存（CSP 中间件与公开接口复用，写操作显式失效）                                        |
+| `src/server/captcha.server.ts`             | 可选 Cap 人机验证（`CAP_SITE`/`CAP_KEY`），供注册、登录、重置密码和评论使用                                    |
+| `src/lib/moderation.ts`                    | AI 反垃圾评论纯逻辑：环境变量解析与校验、System One 请求/响应、决策、缓存键、spamReason 标签（无 I/O，可单测） |
+| `src/server/moderation.server.ts`          | AI 反垃圾评论服务端：配置记忆化、带超时/退避重试的 System One 调用、TTL 缓存、分级日志                         |
+| `src/components/captcha.tsx`               | `cap-widget` 包装，上报一次性 token                                                                            |
+| `src/server/http.server.ts`                | 请求体读取、查询参数解析和 JSON 响应 helper                                                                    |
+| `src/server/api.server.ts`                 | `/api/v1/*` 分发及评论、站点管理业务                                                                           |
+| `src/server/profile.server.ts`             | 个人资料、账户绑定和邮箱变更服务                                                                               |
+| `src/server/mail.server.ts`                | 持久化邮件 outbox 和 SMTP worker                                                                               |
+| `src/start.ts`                             | 请求中间件和安全响应头                                                                                         |
+| `src/router.tsx`                           | 每个 router 独立的 QueryClient                                                                                 |
+| `src/routes/`                              | 页面和 API 文件路由                                                                                            |
+| `src/routes/admin/`                        | 后台子路由：站点视图 `/admin/site/$siteId/*`、实例视图 `/admin/instance/*`                                     |
+| `src/components/admin-shell.tsx`           | 后台外壳：侧栏导航、顶栏、创建站点和未保存设置拦截                                                             |
+| `src/components/admin/`                    | 站点后台子模块（评审、统计、集成、设置、成员、站点选择）                                                       |
+| `src/components/instance/`                 | 实例后台子模块（用户、站点、邮件、审计、系统设置）                                                             |
+| `src/lib/queries.ts`                       | 共享 queryOptions（dashboard / siteDetail / profile）                                                          |
+| `src/server/admin.server.ts`               | 实例管理员接口、用户/站点/邮件运维与审计                                                                       |
+| `src/server/settings.server.ts`            | 加密系统设置、脱敏读取和注册策略                                                                               |
+| `src/components/comment-widget.tsx`        | 评论组件外壳：按 `embed` 参数分支、会话切换、列表、分页与排序                                                  |
+| `src/components/inline-comment-widget.tsx` | 顶层（非 iframe）widget，按需加载 cookie 登录 UI                                                               |
+| `src/components/comment-composer.tsx`      | 评论表单、匿名字段、预览与蜜罐                                                                                 |
+| `src/components/comment-thread.tsx`        | 单条评论、嵌套回复、点赞和展开                                                                                 |
+| `src/components/markdown.tsx`              | 统一安全 Markdown 渲染                                                                                         |
+| `src/components/`                          | 认证、个人资料和公共 UI 组件                                                                                   |
+| `src/styles.css`                           | Tailwind/Kumo 导入、应用样式和响应式布局                                                                       |
+| `public/embed.js`                          | 无依赖 iframe 嵌入脚本和高度消息校验                                                                           |
+| `scripts/`                                 | 环境初始化、数据库迁移、管理员初始化、邮件发送                                                                 |
+| `drizzle/`                                 | 已提交的迁移 SQL 和元数据                                                                                      |
+| `Dockerfile`、`compose.yaml`               | 自托管容器、数据 volume 和健康检查                                                                             |
+| `vercel.json`                              | Vercel 构建命令和邮件 cron                                                                                     |
 
 `src/routeTree.gen.ts` 由路由生成器维护，不要手动修改。不要编辑 `.output`、`.tanstack`、`.nitro`、`.vercel`、`node_modules` 或生成的报告来修复源代码问题。
 
@@ -87,9 +91,12 @@ bun run dev
 bun run generate-routes
 bun run typecheck
 bun run lint
+bun run test
 bun run check
 bun run build
 ```
+
+`bun run test` 只覆盖 `src/**/*.test.ts`（目前为 AI 反垃圾评论模块的纯逻辑与服务端测试，使用 Node 内置 test runner + tsx 与模拟响应，不调用外部 API）。UI 不写单元测试。
 
 生产 Node 产物在 `.output/`，不是 `dist/`：
 
@@ -128,6 +135,7 @@ bun run start
 - 原子限流存储在数据库，不能替换为仅进程内 Map，也不能采用非原子的“先读取再增加”。
 - `TRUSTED_IP_HEADER` 只有在可信入口覆盖该 header 且禁止绕过入口时才可配置。未配置时使用共享保守限流，不能直接信任任意代理 header。
 - 保持 challenge 签名、最短提交等待、honeypot、重复提交检测、链接数量检查及站点屏蔽词。
+- AI 反垃圾检测（可选）只在服务端运行：`DECISION_API_KEY` 只放服务端环境变量、不用公开前缀；只发送评论正文与公开上下文（文章标题/摘要、作者公开昵称与站内计数、父评论、链接），不发送邮箱、IP 或其 HMAC；不可信内容围栏为数据以防范提示词注入；AI 只能收紧审核结果，绝不绕过站点自身审核策略，也不直接永久删除评论。
 - 匿名评论默认审核；垃圾评论不公开。
 - 删除评论清除正文和身份信息，保留树节点以维持回复结构；已删除评论不能直接重新批准。
 - 不记录密码、密钥、session token、数据库 token 或 SMTP 凭据到日志、文档、测试报告或版本控制。
@@ -175,7 +183,7 @@ bun run start
 
 以下是生成本文件时的最近验证记录，不代表未来修改后的状态：
 
-- 当前仓库已移除自动化测试代码、测试配置及对应依赖；不要使用已删除的测试命令。业务与安全流程需人工验收。
+- 仓库仅保留 AI 反垃圾评论模块的单元测试（`bun run test`，Node 内置 test runner + tsx，无新增依赖，不调用外部 API）；其余业务与安全流程仍需人工验收，UI 不写单元测试。历史上已删除的测试命令不要恢复。
 - `bun run typecheck`、`bun run lint`、`bun run check` 和 `bun run build` 均通过；`build` 保持零告警。后续修改仍需重新运行相关检查。
 - 构建通过 `vite.config.ts` 的 Nitro `onwarn` 抑制来自第三方依赖（Kumo/Base UI、TanStack Query）的 `use client`/`use server` 指令告警以及 `EVAL`/`CIRCULAR_DEPENDENCY` 等噪声；`import/no-cycle` 已在 ESLint 中启用以独立检测循环依赖。
 - 尚未完成截图和真实 UI 验证，不能声称 UI 或 E2E 验收已通过。

@@ -32,6 +32,10 @@ const search = z.object({
     .transform((value) => String(value))
     .pipe(z.string().min(1).max(300))
     .optional(),
+  // Optional article context, forwarded by embed.js purely for AI moderation.
+  // Untrusted and only descriptive; it never influences authorization.
+  pageTitle: z.string().trim().max(300).optional(),
+  pageDescription: z.string().trim().max(600).optional(),
   // Set by embed.js. It lets the server render the framed layout (and preload
   // comments) without sniffing `window.parent`, which the server cannot do.
   embed: z
