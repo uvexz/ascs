@@ -3,11 +3,39 @@
 // configured. The secret never leaves the server; the endpoint is public.
 type CaptchaFailure = { status: 400 | 503; message: string }
 
+/** The widget's WASM solver URLs, exposed to its CAP_CUSTOM_* globals. */
+export type CaptchaWasm = { cap: string; hashwx: string }
+
 export function captchaEndpoint(): string | null {
   const site = process.env.CAP_SITE?.trim()
   const key = process.env.CAP_KEY?.trim()
   if (!site || !key) return null
   return site.endsWith('/') ? site : `${site}/`
+}
+
+/**
+ * Points the widget's proof-of-work solver at the Cap instance's own asset
+ * server instead of jsdelivr. CAP_SITE is `<instance>/<site_key>/`, so dropping
+ * the trailing site-key segment yields the instance URL, whose `/assets`
+ * directory serves `cap_wasm_bg.wasm` and `hashwx.wasm`.
+ */
+export function captchaWasm(): CaptchaWasm | null {
+  const endpoint = captchaEndpoint()
+  if (!endpoint) return null
+  let instance: URL
+  try {
+    instance = new URL(endpoint)
+  } catch {
+    return null
+  }
+  const segments = instance.pathname.split('/').filter(Boolean)
+  segments.pop()
+  const prefix = segments.length ? `/${segments.join('/')}` : ''
+  const base = `${instance.origin}${prefix}/assets/`
+  return {
+    cap: `${base}cap_wasm_bg.wasm`,
+    hashwx: `${base}hashwx.wasm`,
+  }
 }
 
 export async function captchaFailure(

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import type { CapSolveEvent, CapWidget } from 'cap-widget'
+import type { CaptchaWasm } from '../server/captcha.server'
 
 // React's JSX types are declared as a namespace; augmenting them is the only way
 // to type the <cap-widget> custom element.
@@ -25,16 +26,25 @@ declare module 'react' {
 export function Captcha({
   id,
   endpoint,
+  wasm,
   onToken,
   widgetRef,
 }: {
   id?: string
   endpoint: string
+  wasm?: CaptchaWasm | null
   onToken: (token: string | null) => void
   widgetRef?: RefObject<CapWidget | null>
 }) {
   const internalRef = useRef<CapWidget>(null)
   const ref = widgetRef ?? internalRef
+  useEffect(() => {
+    // Before the widget runs, point its solver at our own WASM copies; without
+    // these globals it fetches them from jsdelivr.
+    if (!wasm) return
+    window.CAP_CUSTOM_WASM_URL = wasm.cap
+    window.CAP_CUSTOM_HASHWX_URL = wasm.hashwx
+  }, [wasm])
   useEffect(() => {
     // Loaded on the client only, in order: the first registers <cap-widget>, the
     // second attaches floating triggers (`data-cap-floating`) to the DOM.

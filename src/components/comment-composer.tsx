@@ -12,6 +12,7 @@ import type { RefObject } from 'react'
 import type { CapWidget } from 'cap-widget'
 import type { UseMutationResult } from '@tanstack/react-query'
 import type { WidgetOptions } from './comment-thread'
+import type { CaptchaWasm } from '../server/captcha.server'
 
 type ReplyTarget = { id: string; author: string } | null
 
@@ -20,6 +21,7 @@ export function CommentComposer({
   session,
   challenge,
   captcha,
+  captchaWasm,
   formDisabled,
   send,
   reply,
@@ -35,6 +37,7 @@ export function CommentComposer({
   session: { data: { user: { name: string } } | null }
   challenge: string
   captcha: string | null
+  captchaWasm: CaptchaWasm | null
   formDisabled: boolean
   send: UseMutationResult<unknown, Error, Record<string, unknown>>
   reply: ReplyTarget
@@ -157,6 +160,7 @@ export function CommentComposer({
         <Captcha
           id={captchaId}
           endpoint={captcha}
+          wasm={captchaWasm}
           onToken={setCaptchaToken}
           widgetRef={captchaRef}
         />

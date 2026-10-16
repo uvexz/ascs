@@ -392,6 +392,7 @@ export function Widget({
           session={session}
           challenge={config.data.challenge}
           captcha={config.data.captcha}
+          captchaWasm={config.data.captchaWasm}
           formDisabled={formDisabled}
           send={send}
           reply={reply}

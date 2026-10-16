@@ -10,6 +10,7 @@ import { api, errorText, fieldError } from '../lib/api'
 import { resetAuthCaches } from '../lib/cache'
 import { queryKeys, staleTimes } from '../lib/query-keys'
 import type { AuthProviderId } from './auth-providers'
+import type { CaptchaWasm } from '../server/captcha.server'
 
 export function AuthForm({
   compact = false,
@@ -39,10 +40,12 @@ export function AuthForm({
         name: string
         allowRegistration: boolean
         captcha: string | null
+        captchaWasm: CaptchaWasm | null
       }>('auth-config'),
   })
   // Sign-up is not behind Cap; sign-in and password reset are.
   const captcha = providers.data?.captcha ?? null
+  const captchaWasm = providers.data?.captchaWasm ?? null
   useEffect(() => {
     if (providers.data)
       document.title = `${providers.data.name} · ${mode === 'signup' ? '注册' : mode === 'reset' ? '重置密码' : '登录'}`
@@ -202,6 +205,7 @@ export function AuthForm({
           <Captcha
             key={captchaKey}
             endpoint={captcha}
+            wasm={captchaWasm}
             onToken={setCaptchaToken}
           />
         )}

@@ -45,7 +45,7 @@ import {
   verifyChallenge,
   voterIdentity,
 } from './security.server'
-import { captchaEndpoint, captchaFailure } from './captcha.server'
+import { captchaEndpoint, captchaFailure, captchaWasm } from './captcha.server'
 import { flushMail } from './mail.server'
 import { invalidateSite, siteById } from './site-cache.server'
 import { handleAdmin } from './admin.server'
@@ -882,6 +882,7 @@ export async function handleApi(request: Request) {
           theme: context.site.theme,
           challenge: challenge(context.site.id, context.pageKey),
           captcha: captchaEndpoint(),
+          captchaWasm: captchaWasm(),
         },
         200,
         identity.cookie ? { 'Set-Cookie': identity.cookie } : {},
@@ -936,6 +937,7 @@ export async function handleApi(request: Request) {
         ),
         email: true,
         captcha: captchaEndpoint(),
+        captchaWasm: captchaWasm(),
         ...(await publicSettings()),
       })
     if (path[0] === 'sites' && !path[1] && request.method === 'GET')

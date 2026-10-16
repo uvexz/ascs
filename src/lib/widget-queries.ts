@@ -3,6 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { ApiError, api, queryString } from './api'
 import { queryKeys, staleTimes } from './query-keys'
 import type { CommentList } from '../server/api.server'
+import type { CaptchaWasm } from '../server/captcha.server'
 
 export type WidgetConfig = {
   name: string
@@ -10,6 +11,7 @@ export type WidgetConfig = {
   theme: 'auto' | 'light' | 'dark'
   challenge: string
   captcha: string | null
+  captchaWasm: CaptchaWasm | null
 }
 
 type PageInput = { siteId: string; pageUrl: string; pageKey?: string }

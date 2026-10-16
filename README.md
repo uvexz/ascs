@@ -85,7 +85,7 @@ bun run dev
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`：可选 OAuth（`MICROSOFT_TENANT_ID` 可选，默认 `common`）
 - `SMTP_URL`、`MAIL_FROM`：SMTP；注册需要邮箱验证，因此正式环境必须配置。站点邮件与验证邮件写入 outbox，由 cron 或 VPS 定时任务发送
 - `CRON_SECRET`：至少 32 字符，用于 `/api/v1/cron/mail`
-- `CAP_SITE`、`CAP_KEY`：可选 [Cap](https://github.com/tiagozip/cap) 人机验证。二者都设置后，邮箱注册、邮箱登录、重置密码和发布评论都需要通过验证；`CAP_SITE` 为 `https://<instance_url>/<site_key>/`，`CAP_KEY` 为该站点 key 的 secret（不是管理后台密码）。服务端通过 `CAP_SITE` 下的 `siteverify` 校验 token，Cap 实例需允许本站域名的跨域请求
+- `CAP_SITE`、`CAP_KEY`：可选 [Cap](https://github.com/tiagozip/cap) 人机验证。二者都设置后，邮箱注册、邮箱登录、重置密码和发布评论都需要通过验证；`CAP_SITE` 为 `https://<instance_url>/<site_key>/`，`CAP_KEY` 为该站点 key 的 secret（不是管理后台密码）。服务端通过 `CAP_SITE` 下的 `siteverify` 校验 token，Cap 实例需允许本站域名的跨域请求。前端的人机验证 WASM 求解器从 `CAP_SITE` 去掉站点 key 得到的实例地址下的 `/assets` 加载，因此 Cap 实例需开启资源服务（`ENABLE_ASSETS_SERVER=true`；`hashwx.wasm` 需要 `@cap.js/wasm` 0.0.8 及以上），并允许本站域名跨域访问 `cap_wasm_bg.wasm` / `hashwx.wasm`
 - `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`：仅 `admin:init` 使用的一次性管理员初始化变量
 
 认证 cookie 使用 HttpOnly、SameSite=Lax；生产环境从 HTTPS URL 自动使用安全 cookie。Better Auth 的表和 ASCS 业务表由同一次 Drizzle 迁移创建。
