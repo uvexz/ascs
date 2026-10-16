@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { resolveTxt } from 'node:dns/promises'
-import { and, asc, desc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, ne, or, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db'
 import {
@@ -76,6 +76,19 @@ async function publicContext(input: z.infer<typeof pageInput>) {
   url.hash = ''
   return { site, pageUrl: url.href, pageKey: input.pageKey || url.href }
 }
+// A deleted comment exists only to anchor the replies below it, so it stays on
+// the board while at least one descendant is visible; a leaf deletion is gone
+// entirely. Approval is terminal and depth is capped at 4, so a finite nesting
+// of EXISTS covers every possible chain without a recursive CTE.
+const MAX_COMMENT_DEPTH = 4
+function visibleComment(alias: string, level = 0): string {
+  const approved = `${alias}.status = 'approved'`
+  if (level >= MAX_COMMENT_DEPTH) return approved
+  const child = `vc${level + 1}`
+  return `(${approved} or (${alias}.status = 'deleted' and exists (select 1 from comments ${child} where ${child}.parent_id = ${alias}.id and ${child}.site_id = ${alias}.site_id and ${child}.page_key = ${alias}.page_key and ${visibleComment(child, level + 1)})))`
+}
+const visibleComments = sql.raw(visibleComment('comments'))
+
 const counts = (siteId: string) =>
   db
     .select({ status: comments.status, count: sql<number>`count(*)` })
@@ -124,7 +137,7 @@ async function listComments(request: Request) {
           eq(comments.id, input.parentId),
           eq(comments.siteId, site.id),
           eq(comments.pageKey, pageKey),
-          inArray(comments.status, ['approved', 'deleted']),
+          visibleComments,
         ),
       )
       .limit(1)
@@ -136,7 +149,7 @@ async function listComments(request: Request) {
     input.parentId
       ? eq(comments.parentId, input.parentId)
       : isNull(comments.parentId),
-    inArray(comments.status, ['approved', 'deleted']),
+    visibleComments,
   )
   const [threadTotal] = await db
     .select({ count: sql<number>`count(*)` })
@@ -148,7 +161,7 @@ async function listComments(request: Request) {
   const identity = voterIdentity(request, session?.user.id)
   const likeCount = sql<number>`(select count(*) from likes where likes.comment_id = "comments"."id")`
   const liked = sql<number>`exists(select 1 from likes where likes.comment_id = "comments"."id" and likes.voter = ${identity.voter})`
-  const replyCount = sql<number>`(select count(*) from comments as replies where replies.parent_id = "comments"."id" and replies.site_id = "comments"."site_id" and replies.page_key = "comments"."page_key" and replies.status in ('approved', 'deleted'))`
+  const replyCount = sql<number>`(select count(*) from comments as replies where replies.parent_id = "comments"."id" and replies.site_id = "comments"."site_id" and replies.page_key = "comments"."page_key" and ${sql.raw(visibleComment('replies'))})`
   const rows = await db
     .select({
       id: comments.id,
@@ -216,7 +229,7 @@ async function locateComment(request: Request) {
           eq(comments.id, commentId),
           eq(comments.siteId, site.id),
           eq(comments.pageKey, pageKey),
-          inArray(comments.status, ['approved', 'deleted']),
+          visibleComments,
         ),
       )
       .limit(1)
@@ -243,7 +256,7 @@ async function locateComment(request: Request) {
           node.parentId
             ? eq(comments.parentId, node.parentId)
             : isNull(comments.parentId),
-          inArray(comments.status, ['approved', 'deleted']),
+          visibleComments,
         ),
       )
       .as('ranked')
@@ -343,10 +356,11 @@ async function createComment(request: Request) {
   let status: 'pending' | 'approved' | 'spam' = localSpamReason
     ? 'spam'
     : baselineStatus
-  // Local rules win and are never softened. AI moderation runs only on comments
-  // that passed them and can only tighten the outcome: an auto-approval still
-  // yields the site's own baseline (its "review all" policy is never bypassed),
-  // while a quarantine/review/unavailable result overrides it.
+  // Local rules win and are never softened. While AI detection is enabled its
+  // decision is authoritative: an approval publishes the comment directly (it is
+  // not downgraded to the site's baseline review policy), a review/unavailable
+  // result holds it, and only a quarantine marks it spam. The site's own
+  // `moderation` policy still applies when detection is disabled or unavailable.
   if (!localSpamReason) {
     const history = await commentHistory(
       site.id,
@@ -370,10 +384,7 @@ async function createComment(request: Request) {
     })
     if (moderation.enabled) {
       spamReason = moderation.mapped.reason
-      status =
-        moderation.mapped.status === 'approved'
-          ? baselineStatus
-          : moderation.mapped.status
+      status = moderation.mapped.status
     }
   }
   const commentId = randomUUID()
