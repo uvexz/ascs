@@ -352,7 +352,11 @@ export async function handleAdmin(request: Request, path: string[]) {
       check(!problem, 400, problem || 'SMTP 主机不可用')
     }
     try {
-      check(await testMail(input.to), 400, 'SMTP 未启用')
+      check(
+        await testMail(input.to),
+        400,
+        'SMTP 未配置：请启用后台 SMTP，或同时设置 SMTP_URL 与 MAIL_FROM 环境变量',
+      )
     } catch (error) {
       if (error instanceof HttpError) throw error
       throw new HttpError(400, 'SMTP 连接或发送失败，请检查地址、TLS 和凭据')

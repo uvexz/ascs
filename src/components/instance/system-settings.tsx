@@ -128,7 +128,8 @@ export function SystemSettings({
                 : value.smtpSource === 'database'
                   ? '后台配置'
                   : '未配置'}
-              。保存后使用后台 SMTP 配置。密码留空保留已保存值。
+              。后台启用 SMTP 时使用上方配置；未启用时回退到 SMTP_URL /
+              MAIL_FROM 环境变量（如已设置）。密码留空保留已保存值。
             </p>
             <div className="form-width grid gap-5">
               <label className="checkbox-label">

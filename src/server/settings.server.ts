@@ -65,13 +65,13 @@ export async function readSettings(executor: Pick<typeof db, 'select'> = db) {
   }
 }
 export async function safeSettings(): Promise<SafeSystemSettings> {
-  const { settings, revision, saved } = await readSettings()
+  const { settings, revision } = await readSettings()
   return {
     ...settings,
     revision,
     smtp: { ...settings.smtp, password: '' },
     smtpPasswordSet: !!settings.smtp.password,
-    smtpSource: saved
+    smtpSource: settings.smtp.enabled
       ? 'database'
       : process.env.SMTP_URL && process.env.MAIL_FROM
         ? 'environment'

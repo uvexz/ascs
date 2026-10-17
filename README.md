@@ -50,7 +50,7 @@ bun run dev
 
 系统配置保存在数据库，敏感字段使用由 `BETTER_AUTH_SECRET` 派生的密钥进行 AES-256-GCM 加密。后台不会回传 SMTP 密码，留空表示保留，使用清除选项显式删除。备份和迁移时需要同时保留原 `BETTER_AUTH_SECRET`；更换密钥前需先解密并重新加密配置。
 
-尚未保存后台设置时，邮件继续使用 `SMTP_URL` 和 `MAIL_FROM` 环境变量；首次保存系统设置后，SMTP 使用后台配置，需一并填好 SMTP 信息或明确关闭。连接测试使用已保存的配置，会实际发送 SMTP 测试邮件。
+邮件发送优先使用后台启用的 SMTP 配置；后台未启用 SMTP 时，回退到 `SMTP_URL` 和 `MAIL_FROM` 环境变量（保存系统设置不会让环境变量失效）。要停用环境变量发信，请移除这两个变量。连接测试和发送都使用当前生效的配置，会实际发出邮件。
 
 邮件写入持久化 outbox 后会立即尝试投递一次，未成功或未配置 SMTP 时由定时任务兜底；每批最多 20 封，最多尝试 5 次。后台手动发送不替代持续运行的定时任务。
 
@@ -83,7 +83,7 @@ bun run dev
 - `TRUSTED_IP_HEADER`：**生产环境必须设置**（例如 `x-forwarded-for`），且代理必须覆盖而不是追加该 header。未设置时所有访客会被归入同一个 `unknown` IP，登录、注册、评论和 API 的全部按 IP 限流会退化成全实例共享桶，单个人即可让全站不可用。该 header 只接受单个合法 IP，多值链会被视为不可信
 - `ALLOW_LOCALHOST_SITE`：仅开发环境，允许创建 localhost 站点并跳过 DNS 验证
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`：可选 OAuth（`MICROSOFT_TENANT_ID` 可选，默认 `common`）
-- `SMTP_URL`、`MAIL_FROM`：SMTP；注册需要邮箱验证，因此正式环境必须配置。站点邮件与验证邮件写入 outbox，由 cron 或 VPS 定时任务发送
+- `SMTP_URL`、`MAIL_FROM`：SMTP 兜底配置，后台未启用 SMTP 时使用（两者需同时设置）；注册需要邮箱验证，正式环境至少要配置一种发信方式。站点邮件与验证邮件写入 outbox，由 cron 或 VPS 定时任务发送
 - `CRON_SECRET`：至少 32 字符，用于 `/api/v1/cron/mail`
 - `CAP_SITE`、`CAP_KEY`：可选 [Cap](https://github.com/tiagozip/cap) 人机验证。二者都设置后，邮箱注册、邮箱登录、重置密码和发布评论都需要通过验证；`CAP_SITE` 为 `https://<instance_url>/<site_key>/`，`CAP_KEY` 为该站点 key 的 secret（不是管理后台密码）。服务端通过 `CAP_SITE` 下的 `siteverify` 校验 token，Cap 实例需允许本站域名的跨域请求。前端的人机验证 WASM 求解器从 `CAP_SITE` 去掉站点 key 得到的实例地址下的 `/assets` 加载，因此 Cap 实例需开启资源服务（`ENABLE_ASSETS_SERVER=true`；`hashwx.wasm` 需要 `@cap.js/wasm` 0.0.8 及以上），并允许本站域名跨域访问 `cap_wasm_bg.wasm` / `hashwx.wasm`
 - `ADMIN_EMAIL`、`ADMIN_PASSWORD`、`ADMIN_NAME`：仅 `admin:init` 使用的一次性管理员初始化变量

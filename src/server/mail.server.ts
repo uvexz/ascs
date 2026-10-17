@@ -5,14 +5,21 @@ import { db } from '../db'
 import { mailQueue, rateLimits, sites } from '../db/schema'
 import { readSettings } from './settings.server'
 
+function envMailTransport() {
+  if (!process.env.SMTP_URL || !process.env.MAIL_FROM) return null
+  return {
+    transport: nodemailer.createTransport(process.env.SMTP_URL),
+    from: process.env.MAIL_FROM,
+  }
+}
+
 async function mailTransport() {
-  const { settings, saved } = await readSettings()
-  if (!saved && process.env.SMTP_URL && process.env.MAIL_FROM)
-    return {
-      transport: nodemailer.createTransport(process.env.SMTP_URL),
-      from: process.env.MAIL_FROM,
-    }
-  if (!settings.smtp.enabled) return null
+  const { settings } = await readSettings()
+  // An enabled admin-panel SMTP config overrides the environment. Otherwise
+  // SMTP_URL/MAIL_FROM stay the deployment-level fallback, so saving an
+  // unrelated instance setting (which persists the whole settings object with
+  // SMTP disabled by default) never silently turns mail delivery off.
+  if (!settings.smtp.enabled) return envMailTransport()
   const smtp = settings.smtp
   return {
     transport: nodemailer.createTransport({
