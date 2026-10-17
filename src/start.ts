@@ -1,5 +1,36 @@
 import { createMiddleware, createStart } from '@tanstack/react-start'
+import { captchaEndpoint } from './server/captcha.server'
 import { siteById } from './server/site-cache.server'
+
+// TanStack Start emits inline hydration/manifest scripts and this version does
+// not expose a per-request nonce, so a nonce/hash-only policy would break the
+// app. `'unsafe-inline'` keeps the app working; the meaningful hardening here is
+// restricting script and connect sources to this origin and the Cap instance,
+// while `'wasm-unsafe-eval'` lets the Cap solver compile its bundled WASM.
+function contentSecurityPolicy(ancestors: string) {
+  const cap = captchaEndpoint()
+  let capOrigin = ''
+  if (cap) {
+    try {
+      capOrigin = new URL(cap).origin
+    } catch {
+      /* Ignore a malformed CAP_SITE; captchaEndpoint already returned it. */
+    }
+  }
+  const extra = capOrigin ? ` ${capOrigin}` : ''
+  return [
+    // No `default-src`: leaving unlisted resource types unrestricted avoids
+    // breaking the Cap widget's child frame and other third-party embeds.
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${extra}`,
+    `connect-src 'self'${extra}`,
+    `img-src 'self' data: https: http:`,
+    `style-src 'self' 'unsafe-inline'`,
+    `frame-ancestors ${ancestors}`,
+    `object-src 'none'`,
+    `base-uri 'self'`,
+    `form-action 'self'`,
+  ].join('; ')
+}
 
 const securityHeaders = createMiddleware().server(async ({ request, next }) => {
   const url = new URL(request.url)
@@ -14,7 +45,7 @@ const securityHeaders = createMiddleware().server(async ({ request, next }) => {
   const result = await next()
   result.response.headers.set(
     'Content-Security-Policy',
-    `frame-ancestors ${ancestors}; object-src 'none'; base-uri 'self'; form-action 'self'`,
+    contentSecurityPolicy(ancestors),
   )
   result.response.headers.set('X-Content-Type-Options', 'nosniff')
   result.response.headers.set(

@@ -22,6 +22,10 @@ function WidgetLogin() {
     typeof window === 'undefined'
       ? ''
       : new URLSearchParams(window.location.search).get('state') || ''
+  const siteId =
+    typeof window === 'undefined'
+      ? ''
+      : new URLSearchParams(window.location.search).get('siteId') || ''
 
   const relay = useCallback(async () => {
     // Verify the opener before minting a session, so a foreign page that opens
@@ -34,7 +38,7 @@ function WidgetLogin() {
     } catch {
       sameOrigin = false
     }
-    if (!sameOrigin) {
+    if (!sameOrigin || !/^[a-f0-9-]{36}$/.test(siteId)) {
       setError('请从评论区打开登录窗口后重试。')
       return
     }
@@ -43,7 +47,7 @@ function WidgetLogin() {
     try {
       const result = await api<{ token: string }>('widget/session', {
         method: 'POST',
-        body: {},
+        body: { siteId },
         skipAuth: true,
       })
       window.opener.postMessage(
@@ -56,7 +60,7 @@ function WidgetLogin() {
       setError(errorText(errorValue))
       setStatus('idle')
     }
-  }, [state])
+  }, [state, siteId])
 
   useEffect(() => {
     if (started.current || !session.data) return

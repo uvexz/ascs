@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, isNull, lte, sql } from 'drizzle-orm'
+import { and, eq, isNull, lt, lte, sql } from 'drizzle-orm'
 import nodemailer from 'nodemailer'
 import { db } from '../db'
-import { mailQueue, rateLimits } from '../db/schema'
+import { mailQueue, rateLimits, sites } from '../db/schema'
 import { readSettings } from './settings.server'
 
 async function mailTransport() {
@@ -51,12 +51,44 @@ export async function enqueueMail(to: string, subject: string, body: string) {
   await db
     .insert(mailQueue)
     .values({ id: randomUUID(), to, subject, body, availableAt: Date.now() })
+  // Best-effort immediate delivery so verification and reset links do not wait
+  // for the next cron tick (on Vercel Hobby that is up to 24 hours). The outbox
+  // and cron remain the durable fallback; the timer runs after the caller's
+  // transaction has had a chance to commit.
+  setTimeout(() => {
+    void flushMail().catch(() => {})
+  }, 0)
+}
+
+async function pruneExpired() {
+  const now = Date.now()
+  await db.delete(rateLimits).where(lte(rateLimits.resetAt, now - 86_400_000))
+  // Unsent messages keep one-time verification/reset links in their body.
+  // Drop them after a week; a retry before then can still be triggered manually.
+  await db
+    .delete(mailQueue)
+    .where(
+      and(
+        isNull(mailQueue.sentAt),
+        lt(mailQueue.availableAt, now - 7 * 86_400_000),
+      ),
+    )
+  // An unverified site claim must not reserve an origin forever. DNS proof is
+  // the only thing that makes a claim durable.
+  await db
+    .delete(sites)
+    .where(
+      and(isNull(sites.verifiedAt), lt(sites.createdAt, now - 7 * 86_400_000)),
+    )
 }
 
 // Durable leases permit overlapping cron invocations; delivery is at least once.
 export async function flushMail() {
   const configured = await mailTransport()
-  if (!configured) return { sent: 0, configured: false }
+  if (!configured) {
+    await pruneExpired()
+    return { sent: 0, configured: false }
+  }
   const { transport, from } = configured
   const due = await db
     .select()
@@ -120,8 +152,6 @@ export async function flushMail() {
     sent++
   }
   transport.close()
-  await db
-    .delete(rateLimits)
-    .where(lte(rateLimits.resetAt, Date.now() - 86_400_000))
+  await pruneExpired()
   return { sent, configured: true }
 }

@@ -113,6 +113,9 @@ export function Thread({
             ) : (
               <strong className="break-words">{comment.author}</strong>
             )}
+            {comment.registered && comment.status !== 'deleted' && (
+              <span className="badge approved">已验证</span>
+            )}
             <LocalTime value={comment.createdAt} format="date" />
           </div>
           {comment.status === 'deleted' ? (

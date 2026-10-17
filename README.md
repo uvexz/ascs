@@ -52,7 +52,7 @@ bun run dev
 
 尚未保存后台设置时，邮件继续使用 `SMTP_URL` 和 `MAIL_FROM` 环境变量；首次保存系统设置后，SMTP 使用后台配置，需一并填好 SMTP 信息或明确关闭。连接测试使用已保存的配置，会实际发送 SMTP 测试邮件。
 
-邮件仍由持久化 outbox 和定时任务发送，每批最多 20 封，最多尝试 5 次。后台手动发送不替代持续运行的定时任务。
+邮件写入持久化 outbox 后会立即尝试投递一次，未成功或未配置 SMTP 时由定时任务兜底；每批最多 20 封，最多尝试 5 次。后台手动发送不替代持续运行的定时任务。
 
 ## 嵌入博客
 
@@ -71,7 +71,7 @@ bun run dev
 
 可选属性：`data-url` 覆盖文章 URL，`data-page` 使用不会随 URL 改名的稳定文章 ID，`data-title` / `data-description` 提供文章标题和摘要（仅用于 AI 反垃圾检测判断相关性，可省略），`data-accent` 使用 6 位十六进制品牌色，`data-border` 为评论区添加边框和圆角（设为 `false` 关闭），`data-background` 设置背景色（`#rgb` / `#rrggbb`，或带透明通道的 `#rgba` / `#rrggbbaa`）或 http/https 背景图片，`data-background-opacity`（0 到 1）统一调整背景透明度。脚本本身约 2 KB，评论 UI 运行在 sandbox iframe 中，博客 CSS 不会污染评论区。登录时会在服务域名打开顶层弹窗完成认证，成功后自动回到文章页；博客页面无法读取该凭据。首次嵌入前，在后台复制验证 TXT 记录到 `_ascs.<域名>`，再点击“检查验证”。
 
-文章 URL 必须和站点 origin 完全匹配；服务端会重新规范化 URL、校验站点归属和文章标识，不信任脚本传入的权限或用户 ID。
+文章 URL 必须和站点 origin 完全匹配；服务端会重新规范化 URL（去掉 hash 和 `utm_*`、`fbclid`、`gclid` 等常见跟踪参数）、校验站点归属和文章标识，不信任脚本传入的权限或用户 ID。`pageKey` 默认使用规范化后的完整 URL，客户端可以任意指定；对带业务查询参数或会改名的文章，建议用 `data-page` 指定稳定的文章 ID。
 
 ## 环境变量
 
@@ -80,7 +80,7 @@ bun run dev
 - `DATABASE_URL`：本地 `file:./data/ascs.db`，Turso 使用 `libsql://...`
 - `DATABASE_AUTH_TOKEN`：Turso token
 - `BETTER_AUTH_URL`、`BETTER_AUTH_SECRET`：认证回调地址和至少 32 字符密钥
-- `TRUSTED_IP_HEADER`：只有反向代理会覆盖此 header 时才设置，用于限流和封禁 IP
+- `TRUSTED_IP_HEADER`：**生产环境必须设置**（例如 `x-forwarded-for`），且代理必须覆盖而不是追加该 header。未设置时所有访客会被归入同一个 `unknown` IP，登录、注册、评论和 API 的全部按 IP 限流会退化成全实例共享桶，单个人即可让全站不可用。该 header 只接受单个合法 IP，多值链会被视为不可信
 - `ALLOW_LOCALHOST_SITE`：仅开发环境，允许创建 localhost 站点并跳过 DNS 验证
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`、`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`、`MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`：可选 OAuth（`MICROSOFT_TENANT_ID` 可选，默认 `common`）
 - `SMTP_URL`、`MAIL_FROM`：SMTP；注册需要邮箱验证，因此正式环境必须配置。站点邮件与验证邮件写入 outbox，由 cron 或 VPS 定时任务发送
@@ -107,7 +107,7 @@ ASCS 内置可选的 AI 反垃圾评论检测。它在本地规则（屏蔽词�
 ### 工作方式
 
 - 一次请求用 System One 的 `choice` / `noul` / `score` 三类问题评估：`classification`（`normal` / `promotion` / `seo` / `flood` / `keyword_stuffing` / `other_spam`）、`spam`、`promotion`、`relevance`、`risk`，以及是否试图操纵审核系统的 `manipulation`。
-- 评论正文、标题、摘要等不可信内容被围栏标记为“仅数据”，模型输出结构固定，提示词注入无法改变解析 schema（只能试图影响概率），`manipulation` 问题和高风险回退到人工审核进一步兜底。
+- 评论正文被显式围栏标记为“仅数据”；标题、摘要、昵称、网站和 `pageKey` 等上下文由客户端提供，同样被视为不可信数据并限制长度，但不在正文围栏内。模型输出结构固定，提示词注入无法改变解析 schema（只能试图影响概率），`manipulation` 问题和高风险回退到人工审核进一步兜底。
 - 决策综合分类概率、垃圾概率、推广概率、风险评分与结果完整性：
 
 | 状态          | 何时产生                                                                                            | 数据库 `status`                             |
@@ -167,7 +167,7 @@ docker compose up -d --build
 docker compose exec ascs npm run admin:init
 ```
 
-`compose.yaml` 将 `DATABASE_URL` 固定为 `file:/app/data/ascs.db` 并挂载到 `ascs-data` volume。初始化完成后从 `.env` 移除 `ADMIN_PASSWORD` 并重启容器。`compose.yaml` 让容器以非 root 用户运行，并带健康检查。生产 VPS 应在 Nginx/Caddy 后使用 HTTPS；如果配置 IP header，必须让代理覆盖 header 并阻止外部直连容器端口。SMTP outbox 可用 cron 每分钟调用：
+`compose.yaml` 默认使用 `file:/app/data/ascs.db` 并挂载到 `ascs-data` volume；设置 `.env` 中的 `DATABASE_URL` 可覆盖为 Turso 等远程 libSQL 地址。初始化完成后从 `.env` 移除 `ADMIN_PASSWORD` 并重启容器。`compose.yaml` 让容器以非 root 用户运行，并带健康检查。生产 VPS 应在 Nginx/Caddy 后使用 HTTPS；如果配置 IP header，必须让代理覆盖 header 并阻止外部直连容器端口。SMTP outbox 可用 cron 每分钟调用：
 
 ```cron
 * * * * * curl -fsS -H 'Authorization: Bearer <CRON_SECRET>' https://comments.example.com/api/v1/cron/mail >/dev/null
@@ -186,7 +186,7 @@ libSQL/Turso 推荐用于 Vercel；本地 SQLite 适合单机 VPS。数据库迁
 
 ## 安全默认值
 
-匿名评论默认需要审核，所有 mutation 要求 same-origin JSON 请求，公开接口仅返回已发布内容；Markdown 使用 `react-markdown` 且不渲染 raw HTML，链接带 `nofollow noopener noreferrer ugc`；评论内容限制 5,000 字符，回复最多五层，challenge 防止简单机器人，honeypot、屏蔽词、链接数量、重复提交和 libSQL 原子计数限流共同降低垃圾评论。启用 AI 检测后，语义判断由服务端在本地规则之后执行，只向第三方发送评论正文与公开上下文（不含邮箱、IP），API key 仅存于服务端环境变量。删除评论会清除正文和身份摘要但保留树结构；IP、邮箱只保存 HMAC 摘要。
+AI 检测关闭时匿名评论默认需要审核；启用 AI 检测后以 AI 决策为准（`approved` 直接发布，详见上一节）。所有 mutation 要求 same-origin JSON 请求，公开接口仅返回已发布内容；Markdown 使用 `react-markdown` 且不渲染 raw HTML，链接带 `nofollow noopener noreferrer ugc`；评论内容限制 5,000 字符，回复最多五层，challenge 防止简单机器人，honeypot、屏蔽词、链接数量、重复提交和 libSQL 原子计数限流共同降低垃圾评论。启用 AI 检测后，语义判断由服务端在本地规则之后执行，只向第三方发送评论正文与公开上下文（不含邮箱、IP），API key 仅存于服务端环境变量。删除评论会清除正文和身份摘要但保留树结构；IP、邮箱只保存 HMAC 摘要。
 
 ## 检查与升级
 

@@ -1,11 +1,23 @@
 import { randomUUID } from 'node:crypto'
 import { resolveTxt } from 'node:dns/promises'
-import { and, asc, desc, eq, isNull, ne, or, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  ne,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db'
 import {
   bans,
   comments,
+  invitations,
   likes,
   members,
   sites,
@@ -26,6 +38,7 @@ import {
   siteSettings,
 } from '../lib/validation'
 import {
+  allow,
   authorize,
   baseOrigin,
   bearerToken,
@@ -37,6 +50,7 @@ import {
   ipHash,
   isAdmin,
   limit,
+  lockWrite,
   mintWidgetSession,
   requireOrigin,
   requireSession,
@@ -48,7 +62,7 @@ import {
 import { captchaEndpoint, captchaFailure, captchaWasm } from './captcha.server'
 import { moderateComment } from './moderation.server'
 import { extractLinks } from '../lib/moderation'
-import { flushMail } from './mail.server'
+import { enqueueMail, flushMail } from './mail.server'
 import { invalidateSite, siteById } from './site-cache.server'
 import { handleAdmin } from './admin.server'
 import { publicSettings } from './settings.server'
@@ -74,6 +88,16 @@ async function publicContext(input: z.infer<typeof pageInput>) {
     '文章地址不属于此站点',
   )
   url.hash = ''
+  // Tracking parameters create duplicate threads for the same article. Strip
+  // the common ones; meaningful query parameters (for example `?p=123`) stay
+  // part of the URL, and sites that need a stable id should pass `data-page`.
+  for (const key of [...url.searchParams.keys()])
+    if (
+      /^(utm_|fbclid$|gclid$|dclid$|msclkid$|mc_cid$|mc_eid$|_ga$|ref$)/i.test(
+        key,
+      )
+    )
+      url.searchParams.delete(key)
   return { site, pageUrl: url.href, pageKey: input.pageKey || url.href }
 }
 // A deleted comment exists only to anchor the replies below it, so it stays on
@@ -174,6 +198,7 @@ async function listComments(request: Request) {
         string | null
       >`case when ${comments.status} = 'deleted' then null else ${user.website} end`,
       body: sql<string>`case when ${comments.status} = 'deleted' then '' else ${comments.body} end`,
+      registered: sql<number>`${comments.userId} is not null`,
       status: comments.status,
       depth: comments.depth,
       createdAt: comments.createdAt,
@@ -204,7 +229,11 @@ async function listComments(request: Request) {
       ),
     )
   return {
-    items: rows.map((row) => ({ ...row, liked: !!row.liked })),
+    items: rows.map((row) => ({
+      ...row,
+      liked: !!row.liked,
+      registered: !!row.registered,
+    })),
     hasMore: page < totalPages,
     total: total.count,
     threadTotal: threadTotal.count,
@@ -284,6 +313,11 @@ async function createComment(request: Request) {
   const failure = await captchaFailure(input.captchaToken)
   if (failure) throw new HttpError(failure.status, failure.message)
   const session = await getSession(request)
+  check(
+    !session?.widget || session.widgetSiteId === site.id,
+    403,
+    '登录状态不适用于此站点，请重新登录',
+  )
   check(site.allowAnonymous || session, 401, '此站点需要登录后评论')
   check(session || (input.author && input.email), 400, '匿名评论需要昵称和邮箱')
   const emailHash = digest(
@@ -341,11 +375,14 @@ async function createComment(request: Request) {
     .split(/\r?\n/)
     .map((v) => v.trim().toLowerCase())
     .filter(Boolean)
-  const localSpamReason = words.some((word) =>
-    input.body.toLowerCase().includes(word),
-  )
+  // Blocked words apply to every user-controlled surface, not just the body;
+  // otherwise a nickname or profile website can carry the blocked term.
+  const localText = [input.body, author, session?.user.website ?? '']
+    .join('\n')
+    .toLowerCase()
+  const localSpamReason = words.some((word) => localText.includes(word))
     ? 'blocked-word'
-    : (input.body.match(/https?:\/\//gi)?.length || 0) > 3
+    : extractLinks(input.body).length > 3
       ? 'too-many-links'
       : null
   const baselineStatus: 'pending' | 'approved' =
@@ -387,6 +424,27 @@ async function createComment(request: Request) {
       status = moderation.mapped.status
     }
   }
+  // Only a verified member address may receive notifications, and the site
+  // gets a bounded number per hour. Re-checking at send time also protects
+  // deployments whose stored settings predate the settings-endpoint validation.
+  let notify = false
+  if (site.notificationEmail && status !== 'spam') {
+    const recipient = site.notificationEmail.toLowerCase()
+    const member = await db
+      .select({ id: members.userId })
+      .from(members)
+      .innerJoin(user, eq(user.id, members.userId))
+      .where(
+        and(
+          eq(members.siteId, site.id),
+          eq(user.email, recipient),
+          eq(user.emailVerified, true),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows.at(0))
+    notify = !!member && (await allow(`notify:${site.id}`, 20, 3_600_000))
+  }
   const commentId = randomUUID()
   // Comment and its notification are committed atomically.
   await db.transaction(async (tx) => {
@@ -406,7 +464,7 @@ async function createComment(request: Request) {
       spamReason,
       createdAt: Date.now(),
     })
-    if (site.notificationEmail && status !== 'spam')
+    if (notify && site.notificationEmail)
       await tx.insert(mailQueue).values({
         id: randomUUID(),
         to: site.notificationEmail,
@@ -415,6 +473,7 @@ async function createComment(request: Request) {
         availableAt: Date.now(),
       })
   })
+  if (notify) setTimeout(() => void flushMail().catch(() => {}), 0)
   return json({ id: commentId, status }, 201)
 }
 
@@ -436,6 +495,11 @@ async function toggleLike(request: Request) {
   check(comment, 404, '评论不存在')
   await limit(`like:${site.id}:${ipHash(request)}`, 60)
   const session = await getSession(request)
+  check(
+    !session?.widget || session.widgetSiteId === site.id,
+    403,
+    '登录状态不适用于此站点，请重新登录',
+  )
   const identity = voterIdentity(request, session?.user.id)
   const inserted = await db
     .insert(likes)
@@ -653,8 +717,8 @@ export async function siteDetail(
   siteId: string,
 ): Promise<SiteDetail> {
   id.parse(siteId)
-  const { site, role } = await authorize(request, siteId)
-  const [stats, banned, team, daily] = await Promise.all([
+  const { site, user: actor, role } = await authorize(request, siteId)
+  const [stats, banned, team, pending, daily] = await Promise.all([
     counts(siteId),
     db
       .select({
@@ -680,6 +744,25 @@ export async function siteDetail(
           .from(members)
           .innerJoin(user, eq(user.id, members.userId))
           .where(eq(members.siteId, siteId))
+      : Promise.resolve([]),
+    role === 'owner'
+      ? db
+          .select({
+            id: invitations.id,
+            email: invitations.email,
+            role: invitations.role,
+            createdAt: invitations.createdAt,
+            expiresAt: invitations.expiresAt,
+          })
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.siteId, siteId),
+              isNull(invitations.acceptedAt),
+              gt(invitations.expiresAt, Date.now()),
+            ),
+          )
+          .orderBy(desc(invitations.createdAt))
       : Promise.resolve([]),
     db
       .select({
@@ -709,9 +792,11 @@ export async function siteDetail(
             notificationEmail: null,
           },
     role,
+    selfId: actor.id,
     stats,
     bans: banned,
     members: team,
+    invitations: pending,
     daily,
     canBanIp: !!process.env.TRUSTED_IP_HEADER,
   }
@@ -721,17 +806,34 @@ async function manageSite(request: Request, siteId: string, action?: string) {
   if (!action && request.method === 'GET')
     return json(await siteDetail(request, siteId))
   id.parse(siteId)
-  const { site } = await authorize(
+  const {
+    site,
+    user: actor,
+    role,
+  } = await authorize(
     request,
     siteId,
-    ['verify', 'members', 'settings'].includes(action || '') ||
+    ['verify', 'settings', 'invitations'].includes(action || '') ||
       request.method === 'PATCH',
   )
   if (!action && request.method === 'PATCH') {
-    await db
-      .update(sites)
-      .set(siteSettings.parse(await body(request)))
-      .where(eq(sites.id, siteId))
+    const settings = siteSettings.parse(await body(request))
+    if (settings.notificationEmail) {
+      const [member] = await db
+        .select({ id: user.id })
+        .from(members)
+        .innerJoin(user, eq(user.id, members.userId))
+        .where(
+          and(
+            eq(members.siteId, siteId),
+            eq(user.email, settings.notificationEmail.toLowerCase()),
+            eq(user.emailVerified, true),
+          ),
+        )
+        .limit(1)
+      check(member, 400, '通知邮箱必须是站点成员的已验证邮箱')
+    }
+    await db.update(sites).set(settings).where(eq(sites.id, siteId))
     invalidateSite(siteId)
     return json({ ok: true })
   }
@@ -757,10 +859,44 @@ async function manageSite(request: Request, siteId: string, action?: string) {
       }
     }
     check(valid, 400, '未找到匹配的 DNS TXT 记录，请检查配置并等待 DNS 生效')
-    await db
-      .update(sites)
-      .set({ verifiedAt: Date.now() })
-      .where(eq(sites.id, siteId))
+    await db.transaction(async (tx) => {
+      await lockWrite(tx)
+      const [conflict] = await tx
+        .select({ id: sites.id })
+        .from(sites)
+        .where(
+          and(
+            eq(sites.origin, site.origin),
+            isNotNull(sites.verifiedAt),
+            ne(sites.id, siteId),
+          ),
+        )
+        .limit(1)
+      check(!conflict, 409, '该站点地址已被其他已验证站点占用')
+      await tx
+        .update(sites)
+        .set({ verifiedAt: Date.now() })
+        .where(eq(sites.id, siteId))
+      // Whoever proved DNS ownership wins; other pending claims for the same
+      // origin are removed so they cannot linger as a takeover attempt.
+      await tx
+        .delete(sites)
+        .where(
+          and(
+            eq(sites.origin, site.origin),
+            isNull(sites.verifiedAt),
+            ne(sites.id, siteId),
+          ),
+        )
+      await tx.insert(auditLogs).values({
+        id: randomUUID(),
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'site.verify',
+        target: siteId,
+        createdAt: Date.now(),
+      })
+    })
     invalidateSite(siteId)
     return json({ ok: true })
   }
@@ -836,64 +972,120 @@ async function manageSite(request: Request, siteId: string, action?: string) {
     return json({ ok: true })
   }
   if (action === 'members' && request.method === 'POST') {
+    check(role === 'owner', 403, '只有站点所有者可以邀请成员')
+    // DNS ownership must be proven first: an unverified site would otherwise
+    // let any account use the instance SMTP to mail arbitrary addresses.
+    check(site.verifiedAt, 400, '请先完成站点 DNS 验证，再邀请成员')
     const input = memberInput.parse(await body(request))
     check(
       input.role !== 'owner' || input.confirmOwner,
       400,
-      '请确认所有者权限及当前后台无法移除所有者的限制',
+      '请确认授予所有者权限',
     )
-    const [person] = await db
-      .select()
-      .from(user)
-      .where(eq(user.email, input.email.toLowerCase()))
-      .limit(1)
-    check(person, 400, '请先让该用户注册 ASCS 账号')
-    const existing = await db
-      .select()
-      .from(members)
-      .where(and(eq(members.siteId, siteId), eq(members.userId, person.id)))
-      .limit(1)
-    check(!existing.length, 409, '用户已是成员；修改角色请先移除')
-    // Quota check and insert share a transaction so concurrent grants cannot
-    // both pass the same remaining-quota count.
-    const personIsAdmin = input.role === 'owner' && (await isAdmin(person.id))
-    await db.transaction(async (tx) => {
-      if (input.role === 'owner') {
-        check(!person.disabled, 400, '该用户已停用')
-        if (!personIsAdmin) {
-          const [owned] = await tx
-            .select({ count: sql<number>`count(*)` })
-            .from(members)
-            .where(
-              and(eq(members.userId, person.id), eq(members.role, 'owner')),
-            )
-          check(
-            owned.count < person.siteLimit,
-            400,
-            '该用户站点额度不足，请先调整额度',
-          )
-        }
+    await limit(`invite:${siteId}`, 20, 3_600_000)
+    const email = input.email.toLowerCase()
+    const now = Date.now()
+    const token = randomUUID()
+    const alreadyMember = await db.transaction(async (tx) => {
+      await lockWrite(tx)
+      // Do not reveal whether the address is registered: an address that is not
+      // already a member of this site gets the same 202 response either way.
+      // Only an existing member is reported back, with a 409 and a clear hint.
+      const person = await tx
+        .select({ id: user.id })
+        .from(user)
+        .where(eq(user.email, email))
+        .limit(1)
+        .then((rows) => rows.at(0))
+      if (person) {
+        const existing = await tx
+          .select({ role: members.role })
+          .from(members)
+          .where(and(eq(members.siteId, siteId), eq(members.userId, person.id)))
+          .limit(1)
+          .then((rows) => rows.at(0))
+        if (existing) return true
       }
       await tx
-        .insert(members)
-        .values({ siteId, userId: person.id, role: input.role })
+        .insert(invitations)
+        .values({
+          id: randomUUID(),
+          siteId,
+          email,
+          role: input.role,
+          token,
+          invitedBy: actor.id,
+          createdAt: now,
+          expiresAt: now + 7 * 86_400_000,
+        })
+        .onConflictDoUpdate({
+          target: [invitations.siteId, invitations.email],
+          set: {
+            role: input.role,
+            token,
+            invitedBy: actor.id,
+            createdAt: now,
+            expiresAt: now + 7 * 86_400_000,
+            acceptedAt: null,
+          },
+        })
+      return false
     })
-    return json({ ok: true })
+    if (alreadyMember)
+      throw new HttpError(
+        409,
+        '该用户已是站点成员；如需修改角色，请先移除后重新邀请',
+      )
+    await enqueueMail(
+      email,
+      `邀请你加入 ${site.name}`,
+      `${actor.name} 邀请你以${input.role === 'owner' ? '所有者' : '审核员'}身份加入站点「${site.name}」。\n\n请打开以下链接接受邀请：\n${baseOrigin()}/accept-invitation?token=${encodeURIComponent(token)}\n\n链接 7 天内有效。如果这不是你的操作，请忽略此邮件。`,
+    )
+    await flushMail().catch(() => {})
+    return json({ ok: true, invited: true }, 202)
   }
   if (action === 'members' && request.method === 'DELETE') {
     const input = z.object({ userId: id }).parse(await body(request))
-    // Owners are permanent unless an instance admin uses a maintenance migration.
+    const leaving = input.userId === actor.id
+    if (!leaving) check(role === 'owner', 403, '只有站点所有者可以移除成员')
+    await db.transaction(async (tx) => {
+      await lockWrite(tx)
+      const [targetMember] = await tx
+        .select()
+        .from(members)
+        .where(
+          and(eq(members.siteId, siteId), eq(members.userId, input.userId)),
+        )
+        .limit(1)
+      check(targetMember, 400, '该用户不是站点成员')
+      if (targetMember.role === 'owner') {
+        check(leaving, 400, '不能移除站点所有者，请先转移所有权')
+        const [owners] = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(members)
+          .where(and(eq(members.siteId, siteId), eq(members.role, 'owner')))
+        check(owners.count > 1, 400, '你是唯一所有者，请先转移所有权')
+      }
+      await tx
+        .delete(members)
+        .where(
+          and(eq(members.siteId, siteId), eq(members.userId, input.userId)),
+        )
+    })
+    return json({ ok: true })
+  }
+  if (action === 'invitations' && request.method === 'DELETE') {
+    const input = z.object({ invitationId: id }).parse(await body(request))
     const removed = await db
-      .delete(members)
+      .delete(invitations)
       .where(
         and(
-          eq(members.siteId, siteId),
-          eq(members.userId, input.userId),
-          eq(members.role, 'moderator'),
+          eq(invitations.id, input.invitationId),
+          eq(invitations.siteId, siteId),
         ),
       )
-      .returning()
-    check(removed.length, 400, '只能移除审核员，不能移除站点所有者')
+      .returning({ id: invitations.id })
+    check(removed.length, 404, '邀请不存在或已被使用')
     return json({ ok: true })
   }
   throw new HttpError(404, '接口不存在')
@@ -901,6 +1093,7 @@ async function manageSite(request: Request, siteId: string, action?: string) {
 export type SiteDetail = {
   site: typeof sites.$inferSelect
   role: 'owner' | 'moderator'
+  selfId: string
   stats: { status: typeof comments.$inferSelect.status; count: number }[]
   bans: {
     id: string
@@ -915,7 +1108,87 @@ export type SiteDetail = {
     email: string
     role: 'owner' | 'moderator'
   }[]
+  invitations: {
+    id: string
+    email: string
+    role: 'owner' | 'moderator'
+    createdAt: number
+    expiresAt: number
+  }[]
   daily: { day: string; count: number }[]
+}
+
+async function acceptInvitation(request: Request) {
+  const session = await requireSession(request)
+  const input = z
+    .object({ token: z.string().min(1).max(200) })
+    .parse(await body(request))
+  await limit(`invite-accept:${session.user.id}`, 10)
+  const [invitation] = await db
+    .select()
+    .from(invitations)
+    .where(eq(invitations.token, input.token))
+    .limit(1)
+  check(invitation, 404, '邀请不存在或已失效')
+  check(!invitation.acceptedAt, 409, '邀请已被使用')
+  check(invitation.expiresAt > Date.now(), 410, '邀请已过期')
+  check(
+    invitation.email === session.user.email.toLowerCase(),
+    403,
+    '请使用被邀请的邮箱登录后再接受邀请',
+  )
+  check(!session.user.disabled, 403, '账号已停用')
+  const admin = await isAdmin(session.user.id)
+  await db.transaction(async (tx) => {
+    await lockWrite(tx)
+    const [site] = await tx
+      .select({ id: sites.id })
+      .from(sites)
+      .where(eq(sites.id, invitation.siteId))
+      .limit(1)
+    check(site, 404, '站点不存在')
+    const existing = await tx
+      .select({ role: members.role })
+      .from(members)
+      .where(
+        and(
+          eq(members.siteId, invitation.siteId),
+          eq(members.userId, session.user.id),
+        ),
+      )
+      .limit(1)
+      .then((rows) => rows.at(0))
+    if (!existing) {
+      if (invitation.role === 'owner' && !admin) {
+        const [owned] = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(members)
+          .where(
+            and(eq(members.userId, session.user.id), eq(members.role, 'owner')),
+          )
+        check(
+          owned.count < session.user.siteLimit,
+          400,
+          '你的站点额度不足，无法接受所有者邀请',
+        )
+      }
+      await tx
+        .insert(members)
+        .values({
+          siteId: invitation.siteId,
+          userId: session.user.id,
+          role: invitation.role,
+        })
+        .onConflictDoNothing()
+    }
+    await tx
+      .update(invitations)
+      .set({ acceptedAt: Date.now() })
+      .where(
+        and(eq(invitations.id, invitation.id), isNull(invitations.acceptedAt)),
+      )
+  })
+  return json({ ok: true, siteId: invitation.siteId })
 }
 
 export async function handleApi(request: Request) {
@@ -1002,6 +1275,12 @@ export async function handleApi(request: Request) {
         return json(await confirmEmailChange(request))
       throw new HttpError(405, '不支持此请求方法')
     }
+    if (
+      path[0] === 'invitations' &&
+      path[1] === 'accept' &&
+      request.method === 'POST'
+    )
+      return await acceptInvitation(request)
     if (path[0] === 'dashboard' && request.method === 'GET')
       return json(await dashboard(request))
     if (path[0] === 'auth-config' && request.method === 'GET')
@@ -1029,13 +1308,32 @@ export async function handleApi(request: Request) {
       const admin = await isAdmin(actor.id)
       const input = siteInput.parse(await body(request))
       const siteId = randomUUID()
-      const existing = await db
-        .select({ id: sites.id })
-        .from(sites)
-        .where(eq(sites.origin, input.origin))
-        .limit(1)
-      check(!existing.length, 409, '该站点地址已经存在')
       await db.transaction(async (tx) => {
+        await lockWrite(tx)
+        const [verified] = await tx
+          .select({ id: sites.id })
+          .from(sites)
+          .where(
+            and(eq(sites.origin, input.origin), isNotNull(sites.verifiedAt)),
+          )
+          .limit(1)
+        check(!verified, 409, '该站点地址已经被已验证站点占用')
+        // An unverified claim never reserves an origin. Multiple users may
+        // register the same origin; the first one to prove DNS ownership wins
+        // and the verification path removes the rest.
+        const [ownPending] = await tx
+          .select({ id: sites.id })
+          .from(sites)
+          .innerJoin(members, eq(members.siteId, sites.id))
+          .where(
+            and(
+              eq(sites.origin, input.origin),
+              eq(members.userId, actor.id),
+              isNull(sites.verifiedAt),
+            ),
+          )
+          .limit(1)
+        check(!ownPending, 409, '你已创建过该站点，请继续完成验证')
         if (!admin) {
           const person = await tx
             .select({ siteLimit: user.siteLimit, disabled: user.disabled })
@@ -1088,7 +1386,14 @@ export async function handleApi(request: Request) {
       if (request.method === 'POST') {
         const { user: actor } = await requireSession(request)
         await limit(`widget-session:${actor.id}`, 20)
-        const created = await mintWidgetSession(actor.id)
+        const input = z.object({ siteId: id }).parse(await body(request))
+        const site = await siteById(input.siteId)
+        check(
+          site?.verifiedAt && site.enabled,
+          404,
+          '站点未验证、已停用或不存在',
+        )
+        const created = await mintWidgetSession(actor.id, input.siteId)
         return json(
           {
             token: created.token,

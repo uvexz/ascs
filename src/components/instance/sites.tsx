@@ -16,6 +16,9 @@ export function Sites() {
   const [transferTarget, setTransferTarget] = useState<
     InstanceSites['items'][number] | null
   >(null)
+  const [deleteTarget, setDeleteTarget] = useState<
+    InstanceSites['items'][number] | null
+  >(null)
   const transfer = useMutation({
     mutationFn: (input: { id: string; email: string }) =>
       api(`admin/sites/${input.id}/transfer`, {
@@ -35,6 +38,14 @@ export function Sites() {
       }),
     onSuccess: async () => {
       setSelected(null)
+      await refresh()
+    },
+  })
+  const remove = useMutation({
+    mutationFn: (site: InstanceSites['items'][number]) =>
+      api(`admin/sites/${site.id}`, { method: 'DELETE', body: {} }),
+    onSuccess: async () => {
+      setDeleteTarget(null)
       await refresh()
     },
   })
@@ -101,6 +112,15 @@ export function Sites() {
                     }}
                   >
                     {site.enabled ? '停用' : '启用'}
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      remove.reset()
+                      setDeleteTarget(site)
+                    }}
+                  >
+                    删除
                   </Button>
                 </div>
               </div>
@@ -177,6 +197,29 @@ export function Sites() {
           onClick={() => selected && change.mutate(selected)}
         >
           确认{selected?.enabled ? '停用' : '启用'}
+        </Button>
+      </AppDialog>
+      <AppDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        title="删除站点？"
+        description={`将永久删除「${deleteTarget?.name || ''}」及其全部评论、成员、封禁和邀请。该操作不可恢复，仅在站点抢注或垃圾站点需要清理时使用。`}
+        busy={remove.isPending}
+        alert
+      >
+        {remove.error && (
+          <p role="alert" className="error-box mb-4">
+            {errorText(remove.error)}
+          </p>
+        )}
+        <Button
+          variant="destructive"
+          loading={remove.isPending}
+          onClick={() => deleteTarget && remove.mutate(deleteTarget)}
+        >
+          确认删除
         </Button>
       </AppDialog>
     </>

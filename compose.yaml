@@ -5,7 +5,9 @@ services:
     init: true
     env_file: .env
     environment:
-      DATABASE_URL: file:/app/data/ascs.db
+      # Keep the local-file default for the bundled volume, but let .env point
+      # the container at Turso (or another libSQL URL) when configured.
+      DATABASE_URL: ${DATABASE_URL:-file:/app/data/ascs.db}
     ports:
       - '127.0.0.1:3000:3000'
     volumes:

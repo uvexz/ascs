@@ -43,6 +43,13 @@
       "when": 1791563544639,
       "tag": "0005_yielding_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792251303519,
+      "tag": "0006_slippery_harpoon",
+      "breakpoints": true
     }
   ]
 }

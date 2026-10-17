@@ -1,14 +1,14 @@
 import { betterAuth, APIError } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
 import { bearer } from 'better-auth/plugins/bearer'
-import { eq } from 'drizzle-orm'
+import { and, eq, like } from 'drizzle-orm'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { db } from '../db'
 import * as schema from '../db/schema'
 import { captchaFailure } from '../server/captcha.server'
-import { enqueueMail } from '../server/mail.server'
+import { enqueueMail, flushMail } from '../server/mail.server'
 import { readSettings } from '../server/settings.server'
-import { profileInput } from './validation'
+import { profileInput, WIDGET_SESSION_AGENT } from './validation'
 
 // Endpoints that accept an unauthenticated email or password guess. The Cap
 // token travels in `x-cap-token`, so the password check never runs without it.
@@ -17,6 +17,18 @@ const CAPTCHA_PATHS = new Set([
   '/sign-in/email',
   '/request-password-reset',
   '/forget-password',
+  '/send-verification-email',
+])
+
+// Endpoints that may enqueue a verification or reset email. Their `after` hook
+// drains the outbox immediately, after the endpoint transaction has committed,
+// while the cron job remains the fallback.
+const MAIL_PATHS = new Set([
+  '/sign-up/email',
+  '/sign-in/email',
+  '/request-password-reset',
+  '/forget-password',
+  '/send-verification-email',
 ])
 
 export const auth = betterAuth({
@@ -160,6 +172,16 @@ export const auth = betterAuth({
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
+      // The create hook below still guards OAuth sign-ups. Running this before
+      // the email sign-up endpoint avoids Better Auth converting the 403 into a
+      // generic 200 "check your email" response.
+      if (ctx.path === '/sign-up/email') {
+        const { settings } = await readSettings()
+        if (!settings.allowRegistration)
+          throw new APIError('FORBIDDEN', {
+            message: '管理员已关闭新用户注册',
+          })
+      }
       if (!CAPTCHA_PATHS.has(ctx.path)) return
       const failure = await captchaFailure(ctx.headers?.get('x-cap-token'))
       if (failure)
@@ -167,6 +189,25 @@ export const auth = betterAuth({
           failure.status === 503 ? 'SERVICE_UNAVAILABLE' : 'BAD_REQUEST',
           { message: failure.message },
         )
+    }),
+    after: createAuthMiddleware(async (ctx) => {
+      // A password change must invalidate the 12-hour widget bearers too.
+      // Better Auth only revokes other sessions when the caller asks, so drop
+      // the widget sessions explicitly.
+      if (ctx.path === '/change-password') {
+        const userId = ctx.context.session?.user.id
+        if (userId)
+          await db
+            .delete(schema.session)
+            .where(
+              and(
+                eq(schema.session.userId, userId),
+                like(schema.session.userAgent, `${WIDGET_SESSION_AGENT}%`),
+              ),
+            )
+      }
+      if (!MAIL_PATHS.has(ctx.path)) return
+      await flushMail().catch(() => {})
     }),
   },
   rateLimit: { enabled: true, storage: 'database', window: 60, max: 30 },

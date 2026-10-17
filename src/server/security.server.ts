@@ -1,5 +1,6 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
-import { and, eq, lte, sql } from 'drizzle-orm'
+import { isIP } from 'node:net'
+import { and, eq, like, lte, sql } from 'drizzle-orm'
 import { db } from '../db'
 import {
   instanceAdmins,
@@ -93,14 +94,40 @@ export function requireOrigin(request: Request) {
     '请使用 application/json',
   )
 }
-export function ipHash(request: Request) {
-  // Only enable a header when your ingress overwrites it and direct traffic is blocked.
+/**
+ * Resolve the client IP from the configured trusted header.
+ *
+ * Only a single valid address is accepted. This matches Better Auth's own
+ * parser: a comma-separated chain is ambiguous behind append-style proxies
+ * (the leftmost value is attacker-controlled), so it is rejected instead of
+ * being trusted. Only enable a header when your ingress overwrites it and
+ * direct traffic is blocked.
+ */
+export function clientIp(request: Request): string | null {
   const header = process.env.TRUSTED_IP_HEADER
-  return digest(
-    `ip:${header ? request.headers.get(header)?.split(',')[0].trim() || 'unknown' : 'unknown'}`,
-  )
+  if (!header) return null
+  const raw = request.headers.get(header)?.trim()
+  if (!raw || raw.includes(',')) return null
+  return isIP(raw) ? raw : null
 }
-export async function limit(key: string, max: number, windowMs = 60_000) {
+export function ipHash(request: Request) {
+  return digest(`ip:${clientIp(request) ?? 'unknown'}`)
+}
+/**
+ * Drizzle's libSQL driver ignores `SQLiteTransactionConfig.behavior`, so
+ * `db.transaction(fn, { behavior: 'immediate' })` stays deferred. A no-op
+ * write as the first statement acquires the SQLite write lock explicitly,
+ * giving the same serialization guarantee for check-then-act transactions.
+ */
+export async function lockWrite(executor: Pick<typeof db, 'run'>) {
+  await executor.run(sql`UPDATE rate_limits SET count = count WHERE 0`)
+}
+/** Non-throwing counter used when exceeding the limit should degrade quietly. */
+export async function allow(
+  key: string,
+  max: number,
+  windowMs = 60_000,
+): Promise<boolean> {
   const now = Date.now()
   const [row] = await db
     .insert(rateLimits)
@@ -113,7 +140,10 @@ export async function limit(key: string, max: number, windowMs = 60_000) {
       },
     })
     .returning()
-  check(row.count <= max, 429, '请求过于频繁，请稍后重试')
+  return row.count <= max
+}
+export async function limit(key: string, max: number, windowMs = 60_000) {
+  check(await allow(key, max, windowMs), 429, '请求过于频繁，请稍后重试')
 }
 export function bearerToken(request: Request) {
   const header = request.headers.get('authorization') || ''
@@ -135,7 +165,12 @@ export async function getSession(request: Request) {
     .where(eq(users.id, session.user.id))
     .then((rows) => rows.at(0))
   check(person && !person.disabled, 403, '账号已停用')
-  return { ...session, user: person, widget: !!bearerToken(request) }
+  const agent = session.session.userAgent
+  const widgetSiteId =
+    widget && agent?.startsWith(`${WIDGET_SESSION_AGENT}:`)
+      ? agent.slice(WIDGET_SESSION_AGENT.length + 1)
+      : null
+  return { ...session, user: person, widget, widgetSiteId }
 }
 export async function requireSession(request: Request) {
   const session = await getSession(request)
@@ -143,14 +178,19 @@ export async function requireSession(request: Request) {
   check(!session.widget, 401, '请先登录')
   return session
 }
-export async function mintWidgetSession(userId: string) {
+export async function mintWidgetSession(userId: string, siteId: string) {
   const now = Date.now()
+  // The user agent is the only place Better Auth stores extra session metadata
+  // without a schema change. Encoding the site here keeps the bearer scoped to
+  // the widget it was minted for; legacy `ascs-widget` tokens match no site and
+  // are rejected until the visitor logs in again.
+  const agent = `${WIDGET_SESSION_AGENT}:${siteId}`
   await db
     .delete(sessions)
     .where(
       and(
         eq(sessions.userId, userId),
-        eq(sessions.userAgent, WIDGET_SESSION_AGENT),
+        like(sessions.userAgent, `${WIDGET_SESSION_AGENT}%`),
         lte(sessions.expiresAt, new Date(now)),
       ),
     )
@@ -159,7 +199,7 @@ export async function mintWidgetSession(userId: string) {
     userId,
     false,
     {
-      userAgent: WIDGET_SESSION_AGENT,
+      userAgent: agent,
       expiresAt: new Date(now + WIDGET_SESSION_TTL),
     },
     true,
@@ -174,7 +214,7 @@ export async function revokeWidgetSession(token: string) {
     .where(
       and(
         eq(sessions.token, token),
-        eq(sessions.userAgent, WIDGET_SESSION_AGENT),
+        like(sessions.userAgent, `${WIDGET_SESSION_AGENT}%`),
       ),
     )
 }

@@ -115,6 +115,7 @@ function EmbeddedCommentWidget({ options }: { options: WidgetOptions }) {
     nonceRef.current = nonce
     const url = new URL('/widget-login', window.location.origin)
     url.searchParams.set('state', nonce)
+    url.searchParams.set('siteId', options.siteId)
     const popup = window.open(
       url.href,
       'ascs-widget-login',

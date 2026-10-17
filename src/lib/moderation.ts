@@ -344,9 +344,13 @@ function oneLine(value: string, max: number): string {
   return defang(clampText(value.replace(/\s+/g, ' '), max))
 }
 
-/** Best-effort link extraction used only to describe the comment to the model. */
+/**
+ * Best-effort link extraction used only to describe the comment to the model.
+ * Protocol-relative (`//host`) and bare `www.` links are included because the
+ * local link-count rule must not be bypassable by dropping the scheme.
+ */
 export function extractLinks(text: string): string[] {
-  const matches = text.match(/https?:\/\/[^\s<>"'`)\]]+/gi) ?? []
+  const matches = text.match(/(?:https?:\/\/|\/\/|www\.)[^\s<>"'`)\]]+/gi) ?? []
   const seen = new Set<string>()
   const links: string[] = []
   for (const match of matches) {

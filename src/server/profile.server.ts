@@ -4,7 +4,7 @@ import { db } from '../db'
 import { account, user } from '../db/schema'
 import { emailChangeInput, profileInput } from '../lib/validation'
 import { body } from './http.server'
-import { enqueueMail } from './mail.server'
+import { enqueueMail, flushMail } from './mail.server'
 import {
   baseOrigin,
   check,
@@ -110,6 +110,7 @@ export async function requestEmailChange(request: Request) {
     '确认修改邮箱',
     `请打开以下链接确认将账号邮箱修改为 ${newEmail}：\n${baseOrigin()}/confirm-email-change?token=${encodeURIComponent(token)}\n链接 1 小时内有效。如果这不是你的操作，请忽略此邮件。`,
   )
+  await flushMail().catch(() => {})
   return { status: true }
 }
 

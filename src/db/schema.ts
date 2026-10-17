@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import {
   sqliteTable,
   text,
@@ -99,7 +100,7 @@ export const sites = sqliteTable(
   {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
-    origin: text('origin').notNull().unique(),
+    origin: text('origin').notNull(),
     verificationToken: text('verification_token').notNull(),
     verifiedAt: integer('verified_at'),
     allowAnonymous: integer('allow_anonymous', { mode: 'boolean' })
@@ -117,7 +118,14 @@ export const sites = sqliteTable(
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
   },
   // Backs the dashboard and instance admin site lists (ORDER BY created_at).
-  (t) => [index('sites_created_idx').on(t.createdAt)],
+  // Only a verified claim reserves an origin; unverified rows may coexist until
+  // one of them proves DNS ownership, then the others are pruned.
+  (t) => [
+    index('sites_created_idx').on(t.createdAt),
+    uniqueIndex('sites_verified_origin')
+      .on(t.origin)
+      .where(sql`${t.verifiedAt} is not null`),
+  ],
 )
 export const members = sqliteTable(
   'members',
@@ -133,6 +141,28 @@ export const members = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.siteId, t.userId] }),
     index('members_user_idx').on(t.userId),
+  ],
+)
+export const invitations = sqliteTable(
+  'invitations',
+  {
+    id: text('id').primaryKey(),
+    siteId: text('site_id')
+      .notNull()
+      .references(() => sites.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role', { enum: ['owner', 'moderator'] }).notNull(),
+    token: text('token').notNull().unique(),
+    invitedBy: text('invited_by').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+    acceptedAt: integer('accepted_at'),
+  },
+  (t) => [
+    uniqueIndex('invitation_site_email_idx').on(t.siteId, t.email),
+    index('invitation_email_idx').on(t.email),
   ],
 )
 export const comments = sqliteTable(

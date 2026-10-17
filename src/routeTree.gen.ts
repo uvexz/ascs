@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AcceptInvitationRouteImport } from './routes/accept-invitation'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
 import { Route as ConfirmEmailChangeRouteImport } from './routes/confirm-email-change'
 import { Route as PrivacyRouteImport } from './routes/privacy'
@@ -39,6 +40,11 @@ import { Route as AdminSiteSiteIdStatisticsRouteImport } from './routes/admin/si
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcceptInvitationRoute = AcceptInvitationRouteImport.update({
+  id: '/accept-invitation',
+  path: '/accept-invitation',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRouteRoute = AdminRouteRouteImport.update({
@@ -172,6 +178,7 @@ const AdminSiteSiteIdStatisticsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/accept-invitation': typeof AcceptInvitationRoute
   '/confirm-email-change': typeof ConfirmEmailChangeRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -199,6 +206,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accept-invitation': typeof AcceptInvitationRoute
   '/confirm-email-change': typeof ConfirmEmailChangeRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteRouteWithChildren
+  '/accept-invitation': typeof AcceptInvitationRoute
   '/confirm-email-change': typeof ConfirmEmailChangeRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/accept-invitation'
     | '/confirm-email-change'
     | '/privacy'
     | '/profile'
@@ -284,6 +294,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accept-invitation'
     | '/confirm-email-change'
     | '/privacy'
     | '/profile'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/accept-invitation'
     | '/confirm-email-change'
     | '/privacy'
     | '/profile'
@@ -340,6 +352,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
+  AcceptInvitationRoute: typeof AcceptInvitationRoute
   ConfirmEmailChangeRoute: typeof ConfirmEmailChangeRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
@@ -358,6 +371,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accept-invitation': {
+      id: '/accept-invitation'
+      path: '/accept-invitation'
+      fullPath: '/accept-invitation'
+      preLoaderRoute: typeof AcceptInvitationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -599,6 +619,7 @@ const AdminRouteRouteWithChildren = AdminRouteRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRouteRoute: AdminRouteRouteWithChildren,
+  AcceptInvitationRoute: AcceptInvitationRoute,
   ConfirmEmailChangeRoute: ConfirmEmailChangeRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,

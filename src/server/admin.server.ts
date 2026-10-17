@@ -43,10 +43,12 @@ import {
   digest,
   HttpError,
   limit,
+  lockWrite,
   requireAdmin,
 } from './security.server'
 import { encryptSettings, readSettings, safeSettings } from './settings.server'
 import { flushMail, testMail } from './mail.server'
+import { publicSmtpHostProblem } from './network.server'
 
 type Actor = { id: string; name: string }
 function audit(actor: Actor, action: string, target: string) {
@@ -279,6 +281,11 @@ export async function handleAdmin(request: Request, path: string[]) {
     const input = systemSettingsInput
       .and(z.object({ revision: z.number().int().min(0) }))
       .parse(await body(request))
+    const next = systemSettingsInput.parse(input)
+    if (next.smtp.enabled) {
+      const problem = await publicSmtpHostProblem(next.smtp.host)
+      check(!problem, 400, problem || 'SMTP 主机不可用')
+    }
     await db.transaction(async (tx) => {
       const current = await readSettings(tx)
       check(
@@ -286,7 +293,7 @@ export async function handleAdmin(request: Request, path: string[]) {
         409,
         '配置已被其他管理员更新，请刷新后重试',
       )
-      const settings = systemSettingsInput.parse(input)
+      const settings = next
       // A stored password is only reused while the destination stays the same;
       // otherwise an admin could point SMTP at their own host and receive it.
       const endpointChanged =
@@ -339,6 +346,11 @@ export async function handleAdmin(request: Request, path: string[]) {
     const input = z
       .object({ to: z.email().max(254) })
       .parse(await body(request))
+    const { settings } = await readSettings()
+    if (settings.smtp.enabled) {
+      const problem = await publicSmtpHostProblem(settings.smtp.host)
+      check(!problem, 400, problem || 'SMTP 主机不可用')
+    }
     try {
       check(await testMail(input.to), 400, 'SMTP 未启用')
     } catch (error) {
@@ -385,6 +397,7 @@ export async function handleAdmin(request: Request, path: string[]) {
     if (request.method === 'DELETE' && !action) {
       check(target !== actor.id, 400, '不能删除自己的账号')
       await db.transaction(async (tx) => {
+        await lockWrite(tx)
         const [person] = await tx.select().from(user).where(eq(user.id, target))
         check(person, 404, '用户不存在')
         const owned = await tx
@@ -433,6 +446,7 @@ export async function handleAdmin(request: Request, path: string[]) {
         '不能停用自己或移除自己的管理员权限',
       )
       await db.transaction(async (tx) => {
+        await lockWrite(tx)
         const [person] = await tx.select().from(user).where(eq(user.id, target))
         check(person, 404, '用户不存在')
         const existingAdmin = await tx
@@ -506,6 +520,7 @@ export async function handleAdmin(request: Request, path: string[]) {
       .object({ email: z.email().max(254) })
       .parse(await body(request))
     await db.transaction(async (tx) => {
+      await lockWrite(tx)
       const [site] = await tx.select().from(sites).where(eq(sites.id, target))
       check(site, 404, '站点不存在')
       const person = await tx
@@ -548,6 +563,24 @@ export async function handleAdmin(request: Request, path: string[]) {
         .insert(auditLogs)
         .values(audit(actor, 'site.transfer', `${target}:${person.id}`))
     })
+    return json({ ok: true })
+  }
+  if (
+    resource === 'sites' &&
+    target &&
+    request.method === 'DELETE' &&
+    !action
+  ) {
+    id.parse(target)
+    await db.transaction(async (tx) => {
+      const deleted = await tx
+        .delete(sites)
+        .where(eq(sites.id, target))
+        .returning({ id: sites.id })
+      check(deleted.length, 404, '站点不存在')
+      await tx.insert(auditLogs).values(audit(actor, 'site.delete', target))
+    })
+    invalidateSite(target)
     return json({ ok: true })
   }
   if (resource === 'sites' && target && request.method === 'PATCH' && !action) {
