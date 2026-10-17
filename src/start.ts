@@ -5,8 +5,10 @@ import { siteById } from './server/site-cache.server'
 // TanStack Start emits inline hydration/manifest scripts and this version does
 // not expose a per-request nonce, so a nonce/hash-only policy would break the
 // app. `'unsafe-inline'` keeps the app working; the meaningful hardening here is
-// restricting script and connect sources to this origin and the Cap instance,
-// while `'wasm-unsafe-eval'` lets the Cap solver compile its bundled WASM.
+// restricting script and connect sources to this origin and the Cap instance.
+// Cap additionally needs `'unsafe-eval'` (its instrumentation challenge runs
+// `new Function`/`eval` inside an srcdoc iframe) and `'wasm-unsafe-eval'` (the
+// solver compiles bundled WASM), so those are granted only when Cap is enabled.
 function contentSecurityPolicy(ancestors: string) {
   const cap = captchaEndpoint()
   let capOrigin = ''
@@ -18,10 +20,11 @@ function contentSecurityPolicy(ancestors: string) {
     }
   }
   const extra = capOrigin ? ` ${capOrigin}` : ''
+  const evalSource = capOrigin ? " 'unsafe-eval'" : ''
   return [
     // No `default-src`: leaving unlisted resource types unrestricted avoids
     // breaking the Cap widget's child frame and other third-party embeds.
-    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${extra}`,
+    `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${evalSource}${extra}`,
     // Cap solves the proof of work in a Worker created from a blob URL. Without
     // an explicit worker-src, the worker falls back to script-src and fails to
     // load, so every challenge ends with "every hashwx worker failed".
