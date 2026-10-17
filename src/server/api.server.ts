@@ -396,8 +396,9 @@ async function createComment(request: Request) {
   // Local rules win and are never softened. While AI detection is enabled its
   // decision is authoritative: an approval publishes the comment directly (it is
   // not downgraded to the site's baseline review policy), a review/unavailable
-  // result holds it, and only a quarantine marks it spam. The site's own
-  // `moderation` policy still applies when detection is disabled or unavailable.
+  // result holds it, and only a quarantine marks it spam. `unavailable` is mapped
+  // by SPAM_FAIL_MODE; the site's `moderation` policy only applies when detection
+  // is disabled.
   if (!localSpamReason) {
     const history = await commentHistory(
       site.id,

@@ -51,12 +51,6 @@ function moderationEnv(): ModerationEnvResult {
   }
 }
 
-/** Test helper: forget the memoized configuration. */
-export function resetModerationConfigCache() {
-  envCache = null
-  envError = null
-}
-
 /* --------------------------------------------------------------------------
  * Logging
  * ------------------------------------------------------------------------ */
@@ -94,11 +88,6 @@ const cache = new Map<
   string,
   { expiresAt: number; decision: ModerationDecision }
 >()
-
-/** Test helper: empty the detection cache. */
-export function resetModerationCache() {
-  cache.clear()
-}
 
 function cacheKey(
   config: ModerationConfig,

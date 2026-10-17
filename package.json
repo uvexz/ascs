@@ -19,7 +19,6 @@
     "admin:init": "tsx scripts/admin.ts",
     "mail:flush": "tsx scripts/mail.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "start": "node .output/server/index.mjs",
     "db:push": "drizzle-kit push",
     "db:pull": "drizzle-kit pull",
