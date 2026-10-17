@@ -22,6 +22,10 @@ function contentSecurityPolicy(ancestors: string) {
     // No `default-src`: leaving unlisted resource types unrestricted avoids
     // breaking the Cap widget's child frame and other third-party embeds.
     `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${extra}`,
+    // Cap solves the proof of work in a Worker created from a blob URL. Without
+    // an explicit worker-src, the worker falls back to script-src and fails to
+    // load, so every challenge ends with "every hashwx worker failed".
+    `worker-src 'self' blob:`,
     `connect-src 'self'${extra}`,
     `img-src 'self' data: https: http:`,
     `style-src 'self' 'unsafe-inline'`,
