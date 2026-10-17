@@ -141,13 +141,15 @@ export function AuthForm({
     }
   }
   return (
-    <div className={compact ? 'auth-compact' : 'auth-panel'}>
+    <div className={compact ? 'auth-compact' : 'auth-shell'}>
       {!compact && (
-        <>
-          <img src="/brand.svg" width="48" height="48" alt="ASCS" />
-          <h1 className="mt-5 text-2xl font-semibold">
-            {providers.data?.name || 'ASCS'}
-          </h1>
+        <div className="auth-brand">
+          <div className="auth-brand-row">
+            <img src="/brand.svg" width="32" height="32" alt="ASCS" />
+            <h1 className="text-2xl font-semibold">
+              {providers.data?.name || 'ASCS'}
+            </h1>
+          </div>
           <p className="text-muted mt-1">
             {mode === 'signup'
               ? '创建账号'
@@ -155,134 +157,139 @@ export function AuthForm({
                 ? '重置密码'
                 : '登录评论管理'}
           </p>
-        </>
+        </div>
       )}
-      {compact && (
-        <h3 className="font-semibold mb-3">
-          {mode === 'signup'
-            ? '创建账号'
-            : mode === 'reset'
-              ? '重置密码'
-              : '登录'}
-        </h3>
-      )}
-      <form onSubmit={submit} className="grid gap-4 mt-6">
-        {mode === 'signup' && (
-          <Input
-            label="昵称"
-            name="name"
-            autoComplete="nickname"
-            required
-            maxLength={60}
-            error={fieldError(error, 'name')}
-          />
+      <div className={compact ? undefined : 'auth-panel'}>
+        {compact && (
+          <h3 className="font-semibold mb-3">
+            {mode === 'signup'
+              ? '创建账号'
+              : mode === 'reset'
+                ? '重置密码'
+                : '登录'}
+          </h3>
         )}
-        <Input
-          label="邮箱"
-          type="email"
-          name="email"
-          autoComplete="email"
-          required
-          maxLength={254}
-          error={fieldError(error, 'email')}
-        />
-        {mode !== 'reset' && (
-          <Input
-            label="密码"
-            description="密码长度为 10–128 个字符。"
-            type="password"
-            name="password"
-            autoComplete={
-              mode === 'signup' ? 'new-password' : 'current-password'
-            }
-            required
-            minLength={10}
-            maxLength={128}
-            error={fieldError(error, 'password')}
-          />
-        )}
-        {captcha && (
-          <Captcha
-            key={captchaKey}
-            endpoint={captcha}
-            wasm={captchaWasm}
-            onToken={setCaptchaToken}
-          />
-        )}
-        {error != null && (
-          <p role="alert" className="error-box">
-            {errorText(error)}
-          </p>
-        )}
-        {notice && (
-          <p role="status" className="success-box">
-            {notice}
-          </p>
-        )}
-        <Button
-          type="submit"
-          variant="primary"
-          loading={busy}
-          disabled={!!captcha && !captchaToken}
+        <form
+          onSubmit={submit}
+          className={compact ? 'grid gap-4 mt-6' : 'grid gap-4'}
         >
-          {mode === 'signup'
-            ? '创建账号'
-            : mode === 'reset'
-              ? '发送重置链接'
-              : '登录'}
-          <ArrowRightIcon size={16} />
-        </Button>
-      </form>
-      {providers.error && mode !== 'reset' && (
-        <p role="alert" className="text-muted mt-4">
-          第三方登录暂时不可用，你仍可以使用邮箱登录。
-        </p>
-      )}
-      {AUTH_PROVIDERS.some((provider) => providers.data?.[provider.id]) &&
-        mode !== 'reset' && (
-          <>
-            <div className="flex flex-wrap gap-2 mt-4">
-              {AUTH_PROVIDERS.filter(
-                (provider) => providers.data?.[provider.id],
-              ).map((provider) => (
-                <Button
-                  key={provider.id}
-                  className="flex-1"
-                  onClick={() => social(provider.id)}
-                  disabled={busy}
-                >
-                  <provider.Icon size={18} />
-                  {provider.name}
-                </Button>
-              ))}
-            </div>
-            {inFrame && (
-              <p className="text-muted mt-2">
-                第三方登录将在新窗口中完成授权。
-              </p>
-            )}
-          </>
+          {mode === 'signup' && (
+            <Input
+              label="昵称"
+              name="name"
+              autoComplete="nickname"
+              required
+              maxLength={60}
+              error={fieldError(error, 'name')}
+            />
+          )}
+          <Input
+            label="邮箱"
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            maxLength={254}
+            error={fieldError(error, 'email')}
+          />
+          {mode !== 'reset' && (
+            <Input
+              label="密码"
+              description="密码长度为 10–128 个字符。"
+              type="password"
+              name="password"
+              autoComplete={
+                mode === 'signup' ? 'new-password' : 'current-password'
+              }
+              required
+              minLength={10}
+              maxLength={128}
+              error={fieldError(error, 'password')}
+            />
+          )}
+          {captcha && (
+            <Captcha
+              key={captchaKey}
+              endpoint={captcha}
+              wasm={captchaWasm}
+              onToken={setCaptchaToken}
+            />
+          )}
+          {error != null && (
+            <p role="alert" className="error-box">
+              {errorText(error)}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="success-box">
+              {notice}
+            </p>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            loading={busy}
+            disabled={!!captcha && !captchaToken}
+          >
+            {mode === 'signup'
+              ? '创建账号'
+              : mode === 'reset'
+                ? '发送重置链接'
+                : '登录'}
+            <ArrowRightIcon size={16} />
+          </Button>
+        </form>
+        {providers.error && mode !== 'reset' && (
+          <p role="alert" className="text-muted mt-4">
+            第三方登录暂时不可用，你仍可以使用邮箱登录。
+          </p>
         )}
-      <div className="flex flex-wrap gap-x-5 gap-y-2 mt-5 text-muted">
-        {(providers.data?.allowRegistration || mode === 'signup') && (
+        {AUTH_PROVIDERS.some((provider) => providers.data?.[provider.id]) &&
+          mode !== 'reset' && (
+            <>
+              <div className="flex flex-wrap gap-2 mt-4">
+                {AUTH_PROVIDERS.filter(
+                  (provider) => providers.data?.[provider.id],
+                ).map((provider) => (
+                  <Button
+                    key={provider.id}
+                    className="flex-1"
+                    onClick={() => social(provider.id)}
+                    disabled={busy}
+                  >
+                    <provider.Icon size={18} />
+                    {provider.name}
+                  </Button>
+                ))}
+              </div>
+              {inFrame && (
+                <p className="text-muted mt-2">
+                  第三方登录将在新窗口中完成授权。
+                </p>
+              )}
+            </>
+          )}
+        <div className="flex flex-wrap gap-x-5 gap-y-2 mt-5 text-muted">
+          {(providers.data?.allowRegistration || mode === 'signup') && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
+            >
+              {mode === 'signup' ? '已有账号，登录' : '创建账号'}
+            </button>
+          )}
+          {providers.data?.allowRegistration === false && (
+            <span>新用户注册已关闭</span>
+          )}
           <button
             type="button"
             disabled={busy}
-            onClick={() => setMode(mode === 'signup' ? 'login' : 'signup')}
+            onClick={() => setMode(mode === 'reset' ? 'login' : 'reset')}
           >
-            {mode === 'signup' ? '已有账号，登录' : '创建账号'}
+            {mode === 'reset' ? '返回登录' : '忘记密码'}
           </button>
-        )}
-        {providers.data?.allowRegistration === false && (
-          <span>新用户注册已关闭</span>
-        )}
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => setMode(mode === 'reset' ? 'login' : 'reset')}
-        >
-          {mode === 'reset' ? '返回登录' : '忘记密码'}
-        </button>
+        </div>
       </div>
     </div>
   )

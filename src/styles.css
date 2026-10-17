@@ -170,6 +170,33 @@ input[type='checkbox'] {
   border: 1px solid var(--line);
   border-radius: 8px;
 }
+.auth-shell {
+  display: grid;
+  gap: 24px;
+  width: min(100%, 390px);
+}
+.auth-shell .auth-panel {
+  width: 100%;
+}
+.auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.auth-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.auth-panel cap-widget,
+.auth-compact cap-widget {
+  display: block;
+  width: 100%;
+  --cap-widget-width: 100%;
+  --cap-border-radius: var(--radius-lg, 8px);
+}
 .auth-compact {
   width: 100%;
 }
