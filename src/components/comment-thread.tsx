@@ -276,9 +276,14 @@ function CommentRow({
           ) : (
             <strong className="break-words">{comment.author}</strong>
           )}
-          {comment.registered && comment.status !== 'deleted' && (
-            <span className="badge approved">已验证</span>
+          {comment.status !== 'deleted' && comment.owner && (
+            <span className="badge approved">站长</span>
           )}
+          {comment.status !== 'deleted' &&
+            !comment.owner &&
+            comment.registered && (
+              <span className="badge approved">已验证</span>
+            )}
           {comment.depth >= 2 && (
             <span className="reply-context">
               <ArrowBendUpLeftIcon size={14} aria-hidden="true" />

@@ -231,6 +231,11 @@ async function listComments(request: Request) {
   const likeCount = sql<number>`(select count(*) from likes where likes.comment_id = "comments"."id")`
   const liked = sql<number>`exists(select 1 from likes where likes.comment_id = "comments"."id" and likes.voter = ${identity.voter})`
   const replyCount = sql<number>`(select count(*) from comments as replies where replies.parent_id = "comments"."id" and replies.site_id = "comments"."site_id" and replies.page_key = "comments"."page_key" and ${sql.raw(visibleComment('replies'))})`
+  // The owner's comments are labelled "站长" in the widget; every other
+  // signed-in commenter keeps the "已验证" badge. The correlated columns must
+  // stay qualified: Drizzle drops the table alias of an interpolated column
+  // inside a subquery.
+  const owner = sql<number>`exists (select 1 from members where members.site_id = "comments"."site_id" and members.user_id = "comments"."user_id" and members.role = 'owner')`
   // Context for flattened deep replies: whose comment the author answered. Only
   // an approved parent can expose a name; a deleted or hidden parent resolves to
   // null and the widget shows a generic note instead.
@@ -251,6 +256,7 @@ async function listComments(request: Request) {
       >`case when ${comments.status} = 'deleted' then null else ${user.website} end`,
       body: sql<string>`case when ${comments.status} = 'deleted' then '' else ${comments.body} end`,
       registered: sql<number>`${comments.userId} is not null`,
+      owner,
       status: comments.status,
       depth: comments.depth,
       createdAt: comments.createdAt,
@@ -285,6 +291,7 @@ async function listComments(request: Request) {
       ...row,
       liked: !!row.liked,
       registered: !!row.registered,
+      owner: !!row.owner,
     })),
     hasMore: page < totalPages,
     total: total.count,
@@ -489,23 +496,43 @@ async function createComment(request: Request) {
   // Only a verified member address may receive notifications, and the site
   // gets a bounded number per hour. Re-checking at send time also protects
   // deployments whose stored settings predate the settings-endpoint validation.
+  // The owner commenting on their own site — or the notification recipient
+  // commenting as themselves — is not news to themselves, so nothing is queued.
   let notify = false
   if (site.notificationEmail && status !== 'spam') {
     const recipient = site.notificationEmail.toLowerCase()
-    const member = await db
-      .select({ id: members.userId })
-      .from(members)
-      .innerJoin(user, eq(user.id, members.userId))
-      .where(
-        and(
-          eq(members.siteId, site.id),
-          eq(user.email, recipient),
-          eq(user.emailVerified, true),
-        ),
-      )
-      .limit(1)
-      .then((rows) => rows.at(0))
-    notify = !!member && (await allow(`notify:${site.id}`, 20, 3_600_000))
+    const authorRole = session
+      ? await db
+          .select({ role: members.role })
+          .from(members)
+          .where(
+            and(
+              eq(members.siteId, site.id),
+              eq(members.userId, session.user.id),
+            ),
+          )
+          .limit(1)
+          .then((rows) => rows.at(0)?.role)
+      : undefined
+    const selfNotify =
+      !!session &&
+      (authorRole === 'owner' || session.user.email.toLowerCase() === recipient)
+    if (!selfNotify) {
+      const member = await db
+        .select({ id: members.userId })
+        .from(members)
+        .innerJoin(user, eq(user.id, members.userId))
+        .where(
+          and(
+            eq(members.siteId, site.id),
+            eq(user.email, recipient),
+            eq(user.emailVerified, true),
+          ),
+        )
+        .limit(1)
+        .then((rows) => rows.at(0))
+      notify = !!member && (await allow(`notify:${site.id}`, 20, 3_600_000))
+    }
   }
   const commentId = randomUUID()
   // Comment and its notification are committed atomically.

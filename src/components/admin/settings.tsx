@@ -158,7 +158,7 @@ export function Settings({
         <div className="form-width">
           <Input
             label="通知邮箱"
-            description="新评论通知会发送到此邮箱；必须是站点成员的已验证账号邮箱，每站每小时最多 20 封。评论者邮箱不会公开。"
+            description="新评论通知会发送到此邮箱；必须是站点成员的已验证账号邮箱，每站每小时最多 20 封；站长本人发布的评论不会触发通知。评论者邮箱不会公开。"
             name="notificationEmail"
             type="email"
             maxLength={254}
