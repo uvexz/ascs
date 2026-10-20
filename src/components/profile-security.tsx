@@ -3,13 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { api, errorText, fieldError } from '../lib/api'
 import { authClient } from '../lib/auth-client'
-import { queryKeys, staleTimes } from '../lib/query-keys'
+import { authConfigQuery } from '../lib/queries'
+import { queryKeys } from '../lib/query-keys'
 import { AUTH_PROVIDERS } from './auth-providers'
 import { AppDialog, QueryError } from './ui'
 import type { AuthProviderId } from './auth-providers'
 import type { ProfileAccounts } from '../server/profile.server'
-
-type AuthConfig = { github: boolean; google: boolean; microsoft: boolean }
 
 export function ProfileSecurity({ email }: { email: string }) {
   const queryClient = useQueryClient()
@@ -22,14 +21,11 @@ export function ProfileSecurity({ email }: { email: string }) {
   } | null>(null)
   const [newEmail, setNewEmail] = useState('')
   const [notice, setNotice] = useState('')
-  const config = useQuery({
-    queryKey: queryKeys.authConfig(),
-    queryFn: () => api<AuthConfig>('auth-config'),
-    staleTime: staleTimes.static,
-  })
+  const config = useQuery(authConfigQuery())
   const accounts = useQuery({
     queryKey: queryKeys.profileAccounts(),
-    queryFn: () => api<ProfileAccounts>('profile/accounts'),
+    queryFn: ({ signal }) =>
+      api<ProfileAccounts>('profile/accounts', { signal }),
   })
   const changeEmail = useMutation({
     mutationFn: (value: string) =>
@@ -95,7 +91,11 @@ export function ProfileSecurity({ email }: { email: string }) {
         <p className="section-description">
           绑定后可以使用对应的第三方账号登录，也可以随时在此解绑。
         </p>
-        {providers.length === 0 ? (
+        {config.error ? (
+          <p role="alert" className="error-box">
+            {errorText(config.error)}
+          </p>
+        ) : providers.length === 0 ? (
           <p className="text-muted">未启用第三方登录。</p>
         ) : (
           <div className="data-list">

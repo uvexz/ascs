@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Button, Input, Popover, Sidebar } from '@cloudflare/kumo'
 import {
   CaretUpDownIcon,
@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import { api, errorText, queryString } from '../../lib/api'
 import { queryKeys } from '../../lib/query-keys'
+import { useDebouncedValue } from '../../lib/use-debounced-value'
 import { Pagination } from '../pagination'
 import type { SiteList } from '../../server/api.server'
 
@@ -32,10 +33,17 @@ export function SiteSwitcher({
   const [q, setQ] = useState('')
   const [page, setPage] = useState(1)
   const [open, setOpen] = useState(false)
+  const debouncedQuery = useDebouncedValue(q)
   const list = useQuery({
-    queryKey: queryKeys.sitePicker(q, page),
+    queryKey: queryKeys.sitePicker(debouncedQuery, page),
     queryFn: ({ signal }) =>
-      api<SiteList>(`sites?${queryString({ q, page })}`, { signal }),
+      api<SiteList>(`sites?${queryString({ q: debouncedQuery, page })}`, {
+        signal,
+      }),
+    // The switcher is only needed once it opens; fetching it on every admin page
+    // load duplicated the site list the dashboard already returned.
+    enabled: open,
+    placeholderData: keepPreviousData,
   })
   const items = list.data?.items ?? []
   const options =
@@ -78,7 +86,9 @@ export function SiteSwitcher({
           />
           <ul className="site-popover-list">
             {!options.length && (
-              <li className="site-popover-empty">暂无站点</li>
+              <li className="site-popover-empty">
+                {list.isPending ? '正在加载…' : '暂无站点'}
+              </li>
             )}
             {options.map((site) => (
               <li key={site.id}>

@@ -105,15 +105,13 @@ export function AdminShell() {
       setCreateOpen(false)
       setFeedback('站点已添加，请完成域名验证。')
       setSettingsDirty(false)
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.dashboard,
-      })
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.sitePicker,
-      })
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.instance,
-      })
+      // Invalidate in parallel: these are independent refetches and the
+      // navigation below does not depend on their individual results.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope.dashboard }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope.sitePicker }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope.instance }),
+      ])
       await navigate({
         to: '/admin/site/$siteId/integration',
         params: { siteId: result.id },

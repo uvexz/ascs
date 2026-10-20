@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { CheckIcon } from '@phosphor-icons/react'
@@ -8,6 +8,15 @@ import { queryKeys } from '../../lib/query-keys'
 import type { SiteSettings } from '../../lib/validation'
 import type { SiteDetail } from '../../server/api.server'
 
+const siteSettingsOf = (detail: SiteDetail): SiteSettings => ({
+  name: detail.site.name,
+  allowAnonymous: detail.site.allowAnonymous,
+  moderation: detail.site.moderation,
+  theme: detail.site.theme,
+  notificationEmail: detail.site.notificationEmail || '',
+  blockedWords: detail.site.blockedWords,
+})
+
 export function Settings({
   detail,
   onDirtyChange,
@@ -16,26 +25,21 @@ export function Settings({
   onDirtyChange: (dirty: boolean) => void
 }) {
   const queryClient = useQueryClient()
-  const [draft, setDraft] = useState<SiteSettings>(() => ({
-    name: detail.site.name,
-    allowAnonymous: detail.site.allowAnonymous,
-    moderation: detail.site.moderation,
-    theme: detail.site.theme,
-    notificationEmail: detail.site.notificationEmail || '',
-    blockedWords: detail.site.blockedWords,
-  }))
+  const [draft, setDraft] = useState<SiteSettings>(() => siteSettingsOf(detail))
   const [dirty, setDirty] = useState(false)
   const [notice, setNotice] = useState('')
+  // Last server snapshot applied to the draft. After a save, the invalidated
+  // site-detail refetch lands asynchronously (and may fail), so comparing
+  // against this snapshot keeps the form from flickering back to pre-save
+  // values while the new detail is still in flight.
+  const synced = useRef(JSON.stringify(siteSettingsOf(detail)))
   useEffect(() => {
-    if (!dirty)
-      setDraft({
-        name: detail.site.name,
-        allowAnonymous: detail.site.allowAnonymous,
-        moderation: detail.site.moderation,
-        theme: detail.site.theme,
-        notificationEmail: detail.site.notificationEmail || '',
-        blockedWords: detail.site.blockedWords,
-      })
+    if (dirty) return
+    const next = siteSettingsOf(detail)
+    const serialized = JSON.stringify(next)
+    if (serialized === synced.current) return
+    synced.current = serialized
+    setDraft(next)
   }, [detail, dirty])
   useEffect(() => {
     onDirtyChange(dirty)

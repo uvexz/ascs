@@ -9,7 +9,9 @@
 export const queryKeys = {
   // A single dashboard entry per session; the active site is resolved from the
   // returned site list (falling back to the site detail query), so the key must
-  // not vary with the selected site.
+  // not vary with the selected site. The key is deliberately not scoped by user
+  // id: every sign-in/sign-out transition must call `resetAuthCaches` so one
+  // account can never read another account's dashboard from the cache.
   dashboard: () => ['dashboard'] as const,
   siteDetail: (siteId?: string) => ['site', siteId] as const,
   sitePicker: (q: string, page: number) => ['site-picker', q, page] as const,
@@ -20,13 +22,10 @@ export const queryKeys = {
   // keyed as a singleton rather than by a caller-supplied user id.
   profile: () => ['profile', 'me'] as const,
   profileAccounts: () => ['profile', 'accounts'] as const,
-  widgetConfig: (
-    siteId: string,
-    pageUrl: string,
-    pageKey: string | undefined,
-    theme: string | undefined,
-    accent: string | undefined,
-  ) => ['widget-config', siteId, pageUrl, pageKey, theme, accent] as const,
+  // The config response only depends on the page identity; theme/accent are
+  // presentational and are deliberately not part of the key (or the request).
+  widgetConfig: (siteId: string, pageUrl: string, pageKey?: string) =>
+    ['widget-config', siteId, pageUrl, pageKey] as const,
   widgetSession: (token: string | null) => ['widget-session', token] as const,
   // One page of root comments for an article.
   commentList: (params: {
@@ -93,4 +92,13 @@ export const queryKeys = {
 export const staleTimes = {
   /** Rarely-changing instance metadata (auth providers, widget config). */
   static: 5 * 60_000,
+} as const
+
+/**
+ * `gcTime` for `staleTimes.static` queries. It must stay above the matching
+ * `staleTime`, otherwise "static" data can be garbage-collected at the exact
+ * moment it stops being fresh, leaving no headroom over the default 5 minutes.
+ */
+export const gcTimes = {
+  static: 30 * 60_000,
 } as const

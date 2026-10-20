@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { Button } from '@cloudflare/kumo'
 import {
   ChatCircleIcon,
@@ -50,11 +55,17 @@ export function CommentManagement({
         `sites/${detail.site.id}/comments?${queryString({ status, page })}`,
         { signal },
       ),
+    // Keep the current page rendered while the next one loads instead of
+    // flashing the whole list into its pending state on every tab/page change.
+    placeholderData: keepPreviousData,
   })
   useEffect(() => {
+    // With `placeholderData` the previous page stays visible while the next one
+    // loads; reconciling then would immediately navigate back to it.
+    if (list.isFetching || list.isPlaceholderData) return
     if (list.data && list.data.page !== page)
       onStateChange({ page: list.data.page })
-  }, [list.data, onStateChange, page])
+  }, [list.data, list.isFetching, list.isPlaceholderData, onStateChange, page])
   async function refresh() {
     await invalidateSiteCaches(queryClient, detail.site.id)
   }
@@ -86,7 +97,7 @@ export function CommentManagement({
       if (context?.previous)
         queryClient.setQueryData<AdminComments>(listKey, context.previous)
     },
-    onSuccess: async (_, input) => {
+    onSuccess: (_, input) => {
       setDeleteId(null)
       setNotice(
         input.status === 'approved'
@@ -95,6 +106,11 @@ export function CommentManagement({
             ? '评论已标记为垃圾评论。'
             : '评论已删除。',
       )
+    },
+    onSettled: async () => {
+      // Reconcile with the server after success *and* failure; onError has
+      // already rolled the optimistic patch back, and this keeps the list
+      // authoritative even when onSuccess would have thrown.
       await refresh()
     },
   })

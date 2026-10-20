@@ -11,7 +11,8 @@ export const Route = createFileRoute('/admin/')({
   component: AdminIndex,
   beforeLoad: async ({ context }) => {
     try {
-      await context.queryClient.fetchQuery(dashboardQuery())
+      // Fail fast: the shell below renders the loading/error state itself.
+      await context.queryClient.fetchQuery({ ...dashboardQuery(), retry: 0 })
     } catch {
       return
     }

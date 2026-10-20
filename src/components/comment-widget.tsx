@@ -69,20 +69,40 @@ function EmbeddedCommentWidget({ options }: { options: WidgetOptions }) {
   // Read the stored token after mount only: the server cannot see localStorage,
   // so a synchronous read here would render a different header than the SSR HTML.
   const [token, setToken] = useState<string | null>(null)
-  useEffect(() => setToken(getWidgetToken()), [])
   const [loginError, setLoginError] = useState('')
   const popupRef = useRef<Window | null>(null)
   const nonceRef = useRef('')
-  const widgetSession = useWidgetSession(token)
-  // The preloaded comment list is anonymous, so a returning signed-in visitor
-  // refetches it once with their bearer token to restore per-voter state (their
-  // own likes). Anonymous visitors keep the preloaded list untouched.
+  const widgetSession = useWidgetSession(token, () => setToken(null))
+  // Whether the current token came from storage (returning visitor) or from the
+  // login popup decides how much has to be refreshed: the hydrated root list is
+  // always anonymous, while the discussions are fetched after mount. A token
+  // obtained mid-session changes the voter state embedded in every cached
+  // discussion, so those have to refresh too.
+  const tokenOrigin = useRef<'storage' | 'login' | null>(null)
+  useEffect(() => {
+    tokenOrigin.current = 'storage'
+    setToken(getWidgetToken())
+  }, [])
   useEffect(() => {
     if (!token) return
-    void queryClient.invalidateQueries({
-      queryKey: queryKeys.scope.comments(options.siteId),
-    })
-  }, [token, queryClient, options.siteId])
+    const origin = tokenOrigin.current
+    tokenOrigin.current = null
+    if (origin === 'storage')
+      // Returning visitor: refresh the preloaded anonymous root list once with
+      // the bearer token so their own likes show; discussions are fetched from
+      // the browser and already carry it.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.commentRoots(
+          options.siteId,
+          options.pageUrl,
+          options.pageKey,
+        ),
+      })
+    else if (origin === 'login')
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.comments(options.siteId),
+      })
+  }, [token, queryClient, options.siteId, options.pageUrl, options.pageKey])
   useEffect(() => {
     const listener = (event: MessageEvent) => {
       if (
@@ -96,20 +116,15 @@ function EmbeddedCommentWidget({ options }: { options: WidgetOptions }) {
       )
         return
       setWidgetToken(event.data.token)
+      tokenOrigin.current = 'login'
       setToken(event.data.token)
       popupRef.current?.close()
       popupRef.current = null
       setLoginError('')
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.widgetSession,
-      })
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.comments(options.siteId),
-      })
     }
     window.addEventListener('message', listener)
     return () => window.removeEventListener('message', listener)
-  }, [queryClient, options.siteId])
+  }, [])
   const openLogin = useCallback(() => {
     const nonce = crypto.randomUUID()
     nonceRef.current = nonce
@@ -287,27 +302,29 @@ export function Widget({
         } catch {
           if (!submittedReply) setPage(1)
         }
-      } else if (!submittedReply) setPage(1)
-      // Keep the invalidation narrow: every discussion is always expanded, so a
-      // site-wide invalidation would refetch up to 20 threads on one post.
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.commentRoots(
-          options.siteId,
-          options.pageUrl,
-          options.pageKey,
-        ),
-      })
-      if (submittedReply && revealedRootId) {
+        // Keep the invalidation narrow: every discussion is always expanded, so
+        // a site-wide invalidation would refetch up to 20 threads on one post.
+        // Only an approved comment can appear in the public lists, so a pending
+        // one does not invalidate anything.
         void queryClient.invalidateQueries({
-          queryKey: queryKeys.commentThread({
-            siteId: options.siteId,
-            pageUrl: options.pageUrl,
-            pageKey: options.pageKey,
-            rootId: revealedRootId,
-          }),
+          queryKey: queryKeys.scope.commentRoots(
+            options.siteId,
+            options.pageUrl,
+            options.pageKey,
+          ),
         })
-        setReveal({ rootId: revealedRootId, commentId: result.id })
-      }
+        if (submittedReply && revealedRootId) {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.commentThread({
+              siteId: options.siteId,
+              pageUrl: options.pageUrl,
+              pageKey: options.pageKey,
+              rootId: revealedRootId,
+            }),
+          })
+          setReveal({ rootId: revealedRootId, commentId: result.id })
+        }
+      } else if (!submittedReply) setPage(1)
       await config.refetch()
     },
     onError: (errorValue) => {

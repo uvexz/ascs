@@ -80,11 +80,28 @@ export const Route = createFileRoute('/widget')({
   // keeps a bad site from failing the route: the widget renders its own error
   // state from the cached failure instead.
   loader: async ({ deps, context }) => {
+    // Fail fast on the server: the widget renders its own loading/error state
+    // and the browser retries on mount, so retrying here only delays the HTML.
+    const retry = 0
     await Promise.allSettled([
-      context.queryClient.fetchQuery(widgetConfigQuery(deps)),
-      context.queryClient.fetchQuery(
-        widgetCommentsQuery({ ...deps, sort: 'newest', page: 1 }),
-      ),
+      context.queryClient.fetchQuery({
+        ...widgetConfigQuery({
+          siteId: deps.siteId,
+          pageUrl: deps.pageUrl,
+          pageKey: deps.pageKey,
+        }),
+        retry,
+      }),
+      context.queryClient.fetchQuery({
+        ...widgetCommentsQuery({
+          siteId: deps.siteId,
+          pageUrl: deps.pageUrl,
+          pageKey: deps.pageKey,
+          sort: 'newest',
+          page: 1,
+        }),
+        retry,
+      }),
     ])
   },
   head: () => ({

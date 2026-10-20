@@ -19,9 +19,14 @@ export const Route = createFileRoute('/admin/site/$siteId')({
   component: SiteLayout,
   loader: async ({ params, context }) => {
     try {
+      // `retry: 0` keeps a failing SSR request from spending the global retry
+      // budget (1s + 2s) before the route can render its error state.
       await Promise.all([
-        context.queryClient.fetchQuery(dashboardQuery()),
-        context.queryClient.fetchQuery(siteDetailQuery(params.siteId)),
+        context.queryClient.fetchQuery({ ...dashboardQuery(), retry: 0 }),
+        context.queryClient.fetchQuery({
+          ...siteDetailQuery(params.siteId),
+          retry: 0,
+        }),
       ])
     } catch (error) {
       if (error instanceof ApiError && [401, 403, 404].includes(error.status))

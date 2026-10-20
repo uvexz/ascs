@@ -16,7 +16,8 @@ export const Route = createFileRoute('/admin/instance')({
   component: InstanceLayout,
   loader: async ({ context }) => {
     try {
-      await context.queryClient.fetchQuery(dashboardQuery())
+      // Fail fast on the server; the client refetches on mount if needed.
+      await context.queryClient.fetchQuery({ ...dashboardQuery(), retry: 0 })
     } catch {
       // Unauthenticated or offline is handled by the shell and the guard below.
     }

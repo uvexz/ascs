@@ -64,7 +64,11 @@ export function Thread({
     queryFn: ({ pageParam, signal }) =>
       api<CommentList>(
         `comments?${queryString({
-          ...options,
+          // Only the fields the endpoint reads; the rest of `options` is styling
+          // or moderation context and is not part of the query key.
+          siteId: options.siteId,
+          pageUrl: options.pageUrl,
+          pageKey: options.pageKey,
           rootId: comment.id,
           // A discussion reads as a conversation regardless of how the root
           // list above is sorted, so replies stay chronological.
@@ -75,9 +79,15 @@ export function Thread({
       ),
     initialPageParam: 1,
     getNextPageParam: (last) => (last.hasMore ? last.page + 1 : undefined),
+    // Bound memory for very long discussions; older pages drop as the visitor
+    // pages forward.
+    maxPages: 10,
     // `replies` counts visible direct replies; zero means there is no discussion
     // unless a reply was just posted here and the root row is still stale.
     enabled: mounted && (comment.replies > 0 || !!revealCommentId),
+    // One of these queries exists per visible root comment; a focus refetch
+    // would multiply requests by the number of discussions on the page.
+    refetchOnWindowFocus: false,
   })
   // A refetch after posting can overlap two pages, so dedupe by id before
   // rendering rather than trusting page boundaries.

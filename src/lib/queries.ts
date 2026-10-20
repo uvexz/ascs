@@ -1,8 +1,9 @@
 import { queryOptions } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
-import { ApiError } from './api'
-import { queryKeys } from './query-keys'
+import { ApiError, api } from './api'
+import { gcTimes, queryKeys, staleTimes } from './query-keys'
 import type { Dashboard, SiteDetail } from '../server/api.server'
+import type { CaptchaWasm } from '../server/captcha.server'
 import type { Profile } from '../server/profile.server'
 
 /**
@@ -120,4 +121,28 @@ export const profileQuery = () =>
   queryOptions({
     queryKey: queryKeys.profile(),
     queryFn: () => fetchProfile().then(unwrap),
+  })
+
+/** Public auth surface: providers, registration policy and captcha settings. */
+export type AuthConfig = {
+  github: boolean
+  google: boolean
+  microsoft: boolean
+  name: string
+  allowRegistration: boolean
+  captcha: string | null
+  captchaWasm: CaptchaWasm | null
+}
+
+/**
+ * Shared by the sign-in form and the profile security page so both read the
+ * same cache entry with the same freshness policy (previously each declared
+ * its own query under this key).
+ */
+export const authConfigQuery = () =>
+  queryOptions({
+    queryKey: queryKeys.authConfig(),
+    queryFn: ({ signal }) => api<AuthConfig>('auth-config', { signal }),
+    staleTime: staleTimes.static,
+    gcTime: gcTimes.static,
   })

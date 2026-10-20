@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { api, errorText } from '../../lib/api'
-import { queryKeys, staleTimes } from '../../lib/query-keys'
+import { gcTimes, queryKeys, staleTimes } from '../../lib/query-keys'
 import { QueryError } from '../ui'
 import type { SafeSystemSettings } from '../../lib/system-settings'
 
@@ -19,6 +19,7 @@ export function SystemSettings({
     queryFn: ({ signal }) =>
       api<SafeSystemSettings>('admin/settings', { signal }),
     staleTime: staleTimes.static,
+    gcTime: gcTimes.static,
   })
   const [notice, setNotice] = useState('')
   useEffect(() => {
@@ -48,7 +49,11 @@ export function SystemSettings({
       api('admin/settings/smtp-test', { method: 'POST', body: { to } }),
     onSuccess: async () => {
       setNotice('测试邮件已发送，请检查收件箱。')
-      await client.invalidateQueries({ queryKey: queryKeys.instance.audit() })
+      // The test changes the mail counters rendered on the overview page.
+      await Promise.all([
+        client.invalidateQueries({ queryKey: queryKeys.instance.audit() }),
+        client.invalidateQueries({ queryKey: queryKeys.instance.overview() }),
+      ])
     },
   })
   const [testTo, setTestTo] = useState('')

@@ -8,6 +8,9 @@ export const Route = createFileRoute('/admin')({
   validateSearch: (input: Record<string, unknown>) => authSearch.parse(input),
   beforeLoad: async () => {
     const session = await fetchSession()
-    return { authenticated: !!(session.ok && session.data) }
+    // Only an explicit "no session" means anonymous. A failed session check is a
+    // service error and must surface as such instead of the login form.
+    if (!session.ok) throw new Error(session.message)
+    return { authenticated: !!session.data }
   },
 })

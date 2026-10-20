@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { useQueryClient, useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Input } from '@cloudflare/kumo'
 import { ArrowRightIcon } from '@phosphor-icons/react'
 import { AUTH_PROVIDERS } from './auth-providers'
 import { Captcha } from './captcha'
 import { authClient } from '../lib/auth-client'
-import { api, errorText, fieldError } from '../lib/api'
+import { errorText, fieldError } from '../lib/api'
 import { resetAuthCaches } from '../lib/cache'
-import { queryKeys, staleTimes } from '../lib/query-keys'
+import { authConfigQuery } from '../lib/queries'
 import type { AuthProviderId } from './auth-providers'
-import type { CaptchaWasm } from '../server/captcha.server'
 
 export function AuthForm({
   compact = false,
@@ -29,20 +28,7 @@ export function AuthForm({
   const [notice, setNotice] = useState('')
   const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const [captchaKey, setCaptchaKey] = useState(0)
-  const providers = useQuery({
-    queryKey: queryKeys.authConfig(),
-    staleTime: staleTimes.static,
-    queryFn: () =>
-      api<{
-        github: boolean
-        google: boolean
-        microsoft: boolean
-        name: string
-        allowRegistration: boolean
-        captcha: string | null
-        captchaWasm: CaptchaWasm | null
-      }>('auth-config'),
-  })
+  const providers = useQuery(authConfigQuery())
   // Sign-up is not behind Cap; sign-in and password reset are.
   const captcha = providers.data?.captcha ?? null
   const captchaWasm = providers.data?.captchaWasm ?? null
