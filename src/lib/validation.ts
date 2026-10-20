@@ -99,11 +99,20 @@ export const pageInput = z.object({
   pageUrl: z.string().url().max(2000),
   pageKey: z.string().trim().min(1).max(300).optional(),
 })
-export const listInput = pageInput.extend({
-  parentId: id.optional(),
-  page: z.coerce.number().int().min(1).max(10000).default(1),
-  sort: z.enum(['newest', 'oldest', 'popular']).default('newest'),
-})
+export const listInput = pageInput
+  .extend({
+    // Direct children of one comment; kept for API compatibility.
+    parentId: id.optional(),
+    // Every visible descendant of one root comment, flattened so the widget can
+    // render a whole discussion without a request per nesting level.
+    rootId: id.optional(),
+    page: z.coerce.number().int().min(1).max(10000).default(1),
+    sort: z.enum(['newest', 'oldest', 'popular']).default('newest'),
+  })
+  .refine((value) => !(value.parentId && value.rootId), {
+    message: '不能同时指定 parentId 和 rootId',
+    path: ['rootId'],
+  })
 export const commentInput = pageInput.extend({
   parentId: id.optional(),
   body: z.string().trim().min(1).max(5000),

@@ -12,6 +12,7 @@ import {
   or,
   sql,
 } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '../db'
 import {
@@ -113,6 +114,29 @@ function visibleComment(alias: string, level = 0): string {
 }
 const visibleComments = sql.raw(visibleComment('comments'))
 
+// A thread page lists every visible descendant of one root comment. The widget
+// renders the discussion as a single flat conversation column, so replies below
+// the first level arrive in the same page instead of one request per parent.
+// Only visible nodes are walked: a deleted comment that still anchors a visible
+// reply is itself visible (see visibleComment), while a comment hidden by
+// moderation stays hidden together with its subtree, as in the previous list.
+function threadScope(rootId: string, siteId: string, pageKey: string) {
+  return sql`${comments.id} in (
+    with recursive thread(id, depth) as (
+      select id, depth from comments
+      where parent_id = ${rootId} and site_id = ${siteId} and page_key = ${pageKey}
+        and ${sql.raw(visibleComment('comments'))}
+      union all
+      select c.id, c.depth from comments c
+      join thread t on c.parent_id = t.id
+      where c.site_id = ${siteId} and c.page_key = ${pageKey}
+        and c.depth = t.depth + 1 and c.depth <= ${MAX_COMMENT_DEPTH}
+        and ${sql.raw(visibleComment('c'))}
+    )
+    select id from thread
+  )`
+}
+
 const counts = (siteId: string) =>
   db
     .select({ status: comments.status, count: sql<number>`count(*)` })
@@ -152,7 +176,27 @@ async function commentHistory(
 async function listComments(request: Request) {
   const input = listInput.parse(params(request))
   const { site, pageKey } = await publicContext(input)
-  if (input.parentId) {
+  // Three list scopes share one response shape: roots (default), one comment's
+  // direct replies (`parentId`, kept for API compatibility), or one root's whole
+  // flattened discussion (`rootId`).
+  let scope: SQL<unknown>
+  if (input.rootId) {
+    const [root] = await db
+      .select({ id: comments.id })
+      .from(comments)
+      .where(
+        and(
+          eq(comments.id, input.rootId),
+          eq(comments.siteId, site.id),
+          eq(comments.pageKey, pageKey),
+          isNull(comments.parentId),
+          visibleComments,
+        ),
+      )
+      .limit(1)
+    check(root, 404, '讨论不存在')
+    scope = threadScope(input.rootId, site.id, pageKey)
+  } else if (input.parentId) {
     const [parent] = await db
       .select()
       .from(comments)
@@ -166,13 +210,14 @@ async function listComments(request: Request) {
       )
       .limit(1)
     check(parent, 404, '回复不存在')
+    scope = eq(comments.parentId, input.parentId)
+  } else {
+    scope = isNull(comments.parentId)
   }
   const where = and(
     eq(comments.siteId, site.id),
     eq(comments.pageKey, pageKey),
-    input.parentId
-      ? eq(comments.parentId, input.parentId)
-      : isNull(comments.parentId),
+    scope,
     visibleComments,
   )
   const [threadTotal] = await db
@@ -186,10 +231,17 @@ async function listComments(request: Request) {
   const likeCount = sql<number>`(select count(*) from likes where likes.comment_id = "comments"."id")`
   const liked = sql<number>`exists(select 1 from likes where likes.comment_id = "comments"."id" and likes.voter = ${identity.voter})`
   const replyCount = sql<number>`(select count(*) from comments as replies where replies.parent_id = "comments"."id" and replies.site_id = "comments"."site_id" and replies.page_key = "comments"."page_key" and ${sql.raw(visibleComment('replies'))})`
+  // Context for flattened deep replies: whose comment the author answered. Only
+  // an approved parent can expose a name; a deleted or hidden parent resolves to
+  // null and the widget shows a generic note instead.
+  const parentAuthor = sql<
+    string | null
+  >`(select coalesce(pu.name, p.author) from comments p left join "user" pu on pu.id = p.user_id where p.id = "comments"."parent_id" and p.site_id = "comments"."site_id" and p.page_key = "comments"."page_key" and p.status = 'approved')`
   const rows = await db
     .select({
       id: comments.id,
       parentId: comments.parentId,
+      parentAuthor,
       author: sql<string>`case when ${comments.status} = 'deleted' then '已删除' else coalesce(${user.name}, ${comments.author}) end`,
       image: sql<
         string | null
@@ -247,10 +299,8 @@ export type CommentList = Awaited<ReturnType<typeof listComments>>
 async function locateComment(request: Request) {
   const input = listInput.extend({ commentId: id }).parse(params(request))
   const { site, pageKey } = await publicContext(input)
-  const path: Array<{ id: string; page: number }> = []
-  let commentId: string | null = input.commentId
-  while (commentId && path.length < 5) {
-    const [node] = await db
+  const visibleNode = (commentId: string) =>
+    db
       .select({ id: comments.id, parentId: comments.parentId })
       .from(comments)
       .where(
@@ -262,43 +312,54 @@ async function locateComment(request: Request) {
         ),
       )
       .limit(1)
-    check(node, 404, '评论或其所属讨论暂不可见，请稍后重试')
-    const likeCount = sql<number>`(select count(*) from likes where likes.comment_id = "comments"."id")`
-    const order =
-      input.sort === 'popular'
-        ? sql`${likeCount} desc, ${comments.createdAt} desc, ${comments.id} asc`
-        : input.sort === 'oldest'
-          ? sql`${comments.createdAt} asc, ${comments.id} asc`
-          : sql`${comments.createdAt} desc, ${comments.id} asc`
-    const ranked = db
-      .select({
-        id: comments.id,
-        position: sql<number>`row_number() over (order by ${order})`.as(
-          'position',
-        ),
-      })
-      .from(comments)
-      .where(
-        and(
-          eq(comments.siteId, site.id),
-          eq(comments.pageKey, pageKey),
-          node.parentId
-            ? eq(comments.parentId, node.parentId)
-            : isNull(comments.parentId),
-          visibleComments,
-        ),
-      )
-      .as('ranked')
-    const [rank] = await db
-      .select({ position: ranked.position })
-      .from(ranked)
-      .where(eq(ranked.id, node.id))
-    check(rank, 404, '评论暂不可见，请稍后重试')
-    path.unshift({ id: node.id, page: Math.ceil(rank.position / PAGE_SIZE) })
-    commentId = node.parentId
+  let [node] = await visibleNode(input.commentId)
+  check(node, 404, '评论或其所属讨论暂不可见，请稍后重试')
+  // Replies always render with their discussion, so only the page holding the
+  // root comment matters when the widget reveals a newly posted comment. The
+  // bound also stops a corrupted parent chain from looping forever.
+  for (let level = 0; node.parentId; level++) {
+    check(level < MAX_COMMENT_DEPTH, 400, '讨论层级超出范围')
+    const parentId = node.parentId
+    const [parent] = await visibleNode(parentId)
+    check(parent, 404, '评论或其所属讨论暂不可见，请稍后重试')
+    node = parent
   }
-  check(!commentId, 400, '讨论层级超出范围')
-  return { id: input.commentId, path }
+  const likeCount = sql<number>`(select count(*) from likes where likes.comment_id = "comments"."id")`
+  const order =
+    input.sort === 'popular'
+      ? sql`${likeCount} desc, ${comments.createdAt} desc, ${comments.id} asc`
+      : input.sort === 'oldest'
+        ? sql`${comments.createdAt} asc, ${comments.id} asc`
+        : sql`${comments.createdAt} desc, ${comments.id} asc`
+  const ranked = db
+    .select({
+      id: comments.id,
+      position: sql<number>`row_number() over (order by ${order})`.as(
+        'position',
+      ),
+    })
+    .from(comments)
+    .where(
+      and(
+        eq(comments.siteId, site.id),
+        eq(comments.pageKey, pageKey),
+        isNull(comments.parentId),
+        visibleComments,
+      ),
+    )
+    .as('ranked')
+  const [rank] = await db
+    .select({ position: ranked.position })
+    .from(ranked)
+    .where(eq(ranked.id, node.id))
+  check(rank, 404, '评论暂不可见，请稍后重试')
+  // `rootId` lets the widget open and extend the discussion that now holds the
+  // comment; `page` is the root-list page it has to be on.
+  return {
+    id: input.commentId,
+    rootId: node.id,
+    page: Math.ceil(rank.position / PAGE_SIZE),
+  }
 }
 export type CommentLocation = Awaited<ReturnType<typeof locateComment>>
 

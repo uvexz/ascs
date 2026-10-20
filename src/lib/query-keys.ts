@@ -28,11 +28,11 @@ export const queryKeys = {
     accent: string | undefined,
   ) => ['widget-config', siteId, pageUrl, pageKey, theme, accent] as const,
   widgetSession: (token: string | null) => ['widget-session', token] as const,
+  // One page of root comments for an article.
   commentList: (params: {
     siteId: string
     pageUrl: string
     pageKey?: string
-    parentId?: string
     sort: 'newest' | 'oldest' | 'popular'
     page: number
   }) =>
@@ -41,9 +41,26 @@ export const queryKeys = {
       params.siteId,
       params.pageUrl,
       params.pageKey,
-      params.parentId,
+      'roots',
       params.sort,
       params.page,
+    ] as const,
+  // The whole conversation under one root comment, loaded as pages by the
+  // widget's infinite query (the page number lives in the query data). Replies
+  // have a fixed chronological order, so the root list's sort is not part of it.
+  commentThread: (params: {
+    siteId: string
+    pageUrl: string
+    pageKey?: string
+    rootId: string
+  }) =>
+    [
+      'comments',
+      params.siteId,
+      params.pageUrl,
+      params.pageKey,
+      'thread',
+      params.rootId,
     ] as const,
   instance: {
     overview: () => ['instance-admin', 'overview'] as const,
@@ -62,6 +79,9 @@ export const queryKeys = {
         : (['admin-comments'] as const),
     comments: (siteId: string) => ['comments', siteId] as const,
     commentsAll: ['comments'] as const,
+    // Every root-list page of one article, without touching its discussions.
+    commentRoots: (siteId: string, pageUrl: string, pageKey?: string) =>
+      ['comments', siteId, pageUrl, pageKey, 'roots'] as const,
     instance: ['instance-admin'] as const,
     instanceResource: (resource: string) =>
       ['instance-admin', resource] as const,

@@ -19,6 +19,16 @@
 3. 服务端通过 Better Auth session、站点授权、来源检查与限流完成认证和隔离，再经 Drizzle 读写 libSQL。
 4. 客户端用 TanStack Query 调用 `/api/v1/*`，mutation 成功后按 query key 精确失效缓存。
 
+## 公开评论接口的列表范围
+
+`GET /api/v1/comments` 用同一个响应结构返回三种范围：
+
+- 默认（不传 `parentId` / `rootId`）：文章的第一层根评论，`page` 与 `sort` 生效。
+- `parentId=<评论 ID>`：某条评论的直接子回复，保留给旧调用方。
+- `rootId=<根评论 ID>`：该根评论的全部可见后代，按时间升序分页；widget 的讨论区始终展开，用它在一次请求里读完整个对话，避免按层级逐级请求。
+
+`GET /api/v1/comments/locate` 返回 `{ id, rootId, page }`：`page` 是根评论在根列表中的页码，`rootId` 是所属讨论的根评论，用于发布评论/回复后的定位。
+
 ## 模块地图
 
 | 路径                                       | 职责                                                                                                   |
@@ -57,7 +67,7 @@
 | `src/components/comment-widget.tsx`        | 评论组件外壳：按 `embed` 参数分支、会话切换、列表、分页与排序                                          |
 | `src/components/inline-comment-widget.tsx` | 顶层（非 iframe）widget，按需加载 cookie 登录 UI                                                       |
 | `src/components/comment-composer.tsx`      | 评论表单、匿名字段、预览与蜜罐                                                                         |
-| `src/components/comment-thread.tsx`        | 单条评论、嵌套回复、点赞和展开                                                                         |
+| `src/components/comment-thread.tsx`        | 单条讨论：始终展开的回复流（统一缩进 + 回复对象标注）、点赞与分页加载                                  |
 | `src/components/markdown.tsx`              | 统一安全 Markdown 渲染                                                                                 |
 | `src/components/captcha.tsx`               | `cap-widget` 包装，上报一次性 token                                                                    |
 | `src/components/`                          | 认证、个人资料和公共 UI 组件                                                                           |

@@ -173,7 +173,17 @@ export function Widget({
   const [error, setError] = useState('')
   const [sort, setSort] = useState<'newest' | 'oldest' | 'popular'>('newest')
   const [page, setPage] = useState(1)
-  const [expandPath, setExpandPath] = useState<string[]>([])
+  // A reply the visitor just posted: its discussion opens that page and scrolls
+  // to the comment. Cleared after a while so later renders do not keep jumping.
+  const [reveal, setReveal] = useState<{
+    rootId: string
+    commentId: string
+  } | null>(null)
+  useEffect(() => {
+    if (!reveal) return
+    const timer = setTimeout(() => setReveal(null), 15_000)
+    return () => clearTimeout(timer)
+  }, [reveal])
   // The initial mode only follows the explicit theme so server HTML and the
   // first client render agree; `prefers-color-scheme` is applied after mount by
   // the effect below.
@@ -263,20 +273,41 @@ export function Widget({
           : '评论已收到，审核通过后会显示',
       )
       setError('')
-      if (result.status === 'approved' && sort !== 'newest') {
+      // Only an approved comment is visible, so only then does the list need to
+      // move. `locate` resolves the root-list page under the current sort and,
+      // for a reply, which discussion to extend.
+      let revealedRootId: string | undefined
+      if (result.status === 'approved') {
         try {
           const location = await api<CommentLocation>(
             `comments/locate?${queryString({ ...options, sort, commentId: result.id })}`,
           )
-          setPage(location.path[0]?.page || 1)
-          setExpandPath(location.path.map((item) => item.id))
+          setPage(location.page)
+          revealedRootId = location.rootId
         } catch {
-          setPage(1)
+          if (!submittedReply) setPage(1)
         }
-      } else setPage(1)
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.scope.comments(options.siteId),
+      } else if (!submittedReply) setPage(1)
+      // Keep the invalidation narrow: every discussion is always expanded, so a
+      // site-wide invalidation would refetch up to 20 threads on one post.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.scope.commentRoots(
+          options.siteId,
+          options.pageUrl,
+          options.pageKey,
+        ),
       })
+      if (submittedReply && revealedRootId) {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.commentThread({
+            siteId: options.siteId,
+            pageUrl: options.pageUrl,
+            pageKey: options.pageKey,
+            rootId: revealedRootId,
+          }),
+        })
+        setReveal({ rootId: revealedRootId, commentId: result.id })
+      }
       await config.refetch()
     },
     onError: (errorValue) => {
@@ -451,8 +482,9 @@ export function Widget({
             key={comment.id}
             comment={comment}
             options={options}
-            sort={sort}
-            expandPath={expandPath}
+            revealCommentId={
+              reveal?.rootId === comment.id ? reveal.commentId : undefined
+            }
             onReply={(target) => {
               setReply(target)
               setPreview(false)

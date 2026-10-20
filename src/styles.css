@@ -887,16 +887,46 @@ input[type='checkbox'] {
   align-items: center;
   flex-wrap: wrap;
 }
+/* Replies are always visible and share a single rail/indent. Deeper replies
+   name the comment they answer instead of nesting further, so the text column
+   stays readable inside a narrow embedded widget. */
 .replies {
-  margin: 12px 0 0 20px;
+  margin: 10px 0 0 20px;
   padding-left: 14px;
   border-left: 1px solid var(--line);
 }
-.replies .thread:last-of-type {
-  border-bottom: none;
+.reply-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
-.replies .pagination {
-  margin-top: 5px;
+.reply-list .thread-main {
+  gap: 9px;
+}
+.reply-list .avatar {
+  width: 26px;
+  height: 26px;
+}
+.reply-context {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.reply-context svg {
+  flex-shrink: 0;
+}
+.replies-status {
+  padding: 2px 0 6px;
+  color: var(--muted);
+}
+.replies-more {
+  margin-top: 10px;
 }
 .widget-footer {
   display: flex;
@@ -1074,15 +1104,22 @@ input[type='checkbox'] {
     gap: 12px;
   }
   .replies {
-    margin-left: 6px;
-    padding-left: 8px;
+    margin-left: 4px;
+    padding-left: 10px;
   }
   .thread-main {
     gap: 8px;
   }
-  .thread .avatar {
+  .thread-main > .avatar {
     width: 25px;
     height: 25px;
+  }
+  .reply-list {
+    gap: 13px;
+  }
+  .reply-list .avatar {
+    width: 24px;
+    height: 24px;
   }
   .comment-meta {
     gap: 6px;
